@@ -1,0 +1,28 @@
+{
+  "name": "jobplanet-dashboard-javascript",
+  "version": "1.0.0",
+  "description": "",
+  "main": "jp_review_server.js",
+  "scripts": {
+    "start": "node jp_review_server.js",
+    "dev": "node jp_review_server.js",
+    "build": "node -e \"console.log('No build step required for static HTML + Express API')\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jobplanet/jobplanet-dashboard-javascript.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jobplanet/jobplanet-dashboard-javascript/issues"
+  },
+  "homepage": "https://github.com/jobplanet/jobplanet-dashboard-javascript#readme",
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.3.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
