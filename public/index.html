@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>잡플래닛 리뷰 PULSE — B v2</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<style>
+.jp-star-solid{display:inline-block;width:1em;height:1em;background-color:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,1.6 15.18,8.04 22.3,9.08 17.15,14.1 18.36,21.18 12,17.84 5.64,21.18 6.85,14.1 1.7,9.08 8.82,8.04' fill='%23000' stroke='%23000' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,1.6 15.18,8.04 22.3,9.08 17.15,14.1 18.36,21.18 12,17.84 5.64,21.18 6.85,14.1 1.7,9.08 8.82,8.04' fill='%23000' stroke='%23000' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;vertical-align:-2px;margin-right:0}
+.stars-row{display:inline-flex;align-items:center;gap:1px;margin-left:5px}
+
+:root{
+  --green:#00C274;--green-a:rgba(0,194,116,.1);--green-b:rgba(0,194,116,.25);
+  --red:#f44336;--yellow:#F0B500;--teal:#1cbda3;--purple:#523cc3;
+  --t1:#323438;--t2:#606368;--t3:#9ea1a8;
+  --bg:#E4EBF4;--card:#fff;--border:#D1DCEB;
+  --shadow:0 2px 12px rgba(0,0,0,.07),0 1px 3px rgba(0,0,0,.04);--r:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:'Pretendard',system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;background:var(--bg)}
+
+/* LAYOUT */
+.app{height:100vh;display:grid;grid-template-rows:60px 1fr;grid-template-columns:clamp(260px,22vw,420px) 1fr;grid-template-areas:"hd hd""lp mp"}
+
+/* HEADER */
+.hd{grid-area:hd;display:flex;align-items:center;padding:0 20px;gap:18px;background:#fff;border-bottom:1px solid var(--border);z-index:100}
+.logo svg{height:22px;width:auto;display:block}
+.logo svg path,.logo svg polygon{fill:var(--green)}
+.hd-title{font-size:18px;font-weight:800;color:var(--t1);letter-spacing:-.02em}
+.hdiv{width:1px;height:20px;background:var(--border)}
+.live-badge{display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--green-a);border:1px solid var(--green-b);border-radius:5px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:.12em}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:ldot 1.4s ease infinite}
+@keyframes ldot{0%,100%{box-shadow:0 0 0 0 rgba(0,194,116,.5)}50%{box-shadow:0 0 0 5px rgba(0,194,116,0)}}
+.ticker{flex:1;display:flex;gap:22px;justify-content:flex-end;align-items:center}
+.ti{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.ti-l{font-size:9px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+.ti-v{font-size:14px;font-weight:600;color:var(--t1);letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1}
+.ti-v.g{color:var(--green)}.ti-v.tl{color:var(--teal)}
+
+/* LEFT PANEL */
+.lp{grid-area:lp;background:var(--bg);border-right:1px solid var(--border);overflow:hidden;padding:0;max-height:calc(100vh - 60px)}
+.lp-fit{box-sizing:border-box;width:100%;padding:16px;display:flex;flex-direction:column;gap:10px;transform-origin:top left}
+.lp-title{flex-shrink:0;padding:2px 2px 6px}
+.lp-title svg{height:20px;width:auto;display:block}
+.lp-title svg path,.lp-title svg polygon{fill:var(--t1)}
+.lp-fit > .card,.lp-fit > .two-col{flex:1 1 auto;min-height:0}
+.lp-fit > .two-col > .card{height:100%;display:flex;flex-direction:column}
+.lp-fit > .card{display:flex;flex-direction:column}
+.lp-fit > .card > .ct,.two-col > .card > .ct{flex-shrink:0}
+#rat-grid,#top-co,#ind-list{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-height:0}
+#top-co,#ind-list{overflow:hidden}
+/* Career donut */
+.donut-wrap{display:flex;align-items:center;gap:14px;flex:1;min-height:0;margin-top:6px}
+.donut{width:clamp(64px,8vh,98px);aspect-ratio:1;border-radius:50%;flex-shrink:0;position:relative;background:#e8eef6}
+.donut::after{content:'';position:absolute;inset:28%;background:var(--card);border-radius:50%}
+.donut-legend{flex:1;display:flex;flex-direction:column;justify-content:center;gap:clamp(5px,1.2vh,9px)}
+.dl-item{display:flex;align-items:center;gap:7px;font-size:clamp(10px,1.4vh,12px)}
+.dl-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.dl-label{color:var(--t2);flex:1;font-weight:500}
+.dl-val{font-weight:700;color:var(--t1);font-variant-numeric:tabular-nums}
+.dl-avg{font-size:10px;color:var(--t3);font-variant-numeric:tabular-nums;margin-left:2px}
+.lp::-webkit-scrollbar{width:4px}
+.lp::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* MAP */
+.mp{grid-area:mp;position:relative;overflow:hidden}
+#map{position:absolute;inset:0}
+.leaflet-container{font-family:'Pretendard',sans-serif!important;background:#E4EBF4!important}
+.leaflet-bar{border:none!important;box-shadow:none!important;background:transparent!important}
+.leaflet-control-zoom a{background:rgba(255,255,255,.95)!important;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--t2)!important;border:none!important;width:28px!important;height:28px!important;line-height:28px!important;font-size:14px!important;font-weight:400!important;border-radius:8px!important;display:block!important;text-align:center;margin-bottom:4px;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:all .15s}
+.leaflet-control-zoom a:hover{background:#fff!important;color:var(--t1)!important}
+.leaflet-control-zoom a:last-child{margin-bottom:0}
+.leaflet-control-attribution{display:none}
+
+/* Floating layer (cards, fanfare) */
+#rc-layer{position:absolute;inset:0;pointer-events:none;z-index:700}
+
+/* Feed float */
+.feed-float{position:absolute;right:16px;top:16px;bottom:16px;width:296px;z-index:900;display:flex;flex-direction:column;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(229,230,233,.8);border-radius:var(--r);box-shadow:0 4px 20px rgba(0,0,0,.1);overflow:hidden}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
+.ct{font-size:clamp(13px,1.7vh,15px);font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.ct-meta{margin-left:auto;font-weight:600;color:var(--t3);letter-spacing:0;text-transform:none;font-size:10px}
+.ct-basis{margin-left:6px;font-weight:400;color:var(--t3);font-size:9px;opacity:.7;letter-spacing:0;text-transform:none}
+
+/* TOTAL CARD — main impact */
+.total-card{padding:18px 16px 16px}
+.total-card .ct{margin-bottom:6px}
+
+/* CUM CARD — 잡플 전체 누적 */
+.cum-card{padding:18px 16px;background:#fff;border:1px solid var(--border)}
+.cum-card .ct{color:var(--t1);margin-bottom:6px;flex-wrap:wrap;gap:4px}
+.cum-meta{font-size:9px;color:var(--t3);font-weight:500;letter-spacing:0;text-transform:none}
+.cum-num{font-size:clamp(30px,4.6vh,46px);font-weight:800;color:var(--green);line-height:1;letter-spacing:-.045em;margin:auto 0 0;font-variant-numeric:tabular-nums;display:flex;justify-content:flex-end;width:100%}
+.cum-days{font-size:10px;color:var(--t3);font-weight:500;text-align:right;margin-top:3px;letter-spacing:0}
+.region-card{padding:14px 14px 22px!important;display:flex;flex-direction:column}
+#age-list{display:flex;flex-direction:column;justify-content:space-between;flex:1;margin-top:6px}
+.total-num{font-size:clamp(40px,8.5vh,96px);font-weight:800;color:var(--t1);line-height:1;letter-spacing:-.045em;margin:auto 0 12px;font-variant-numeric:tabular-nums;display:flex;justify-content:flex-end;width:100%}
+
+/* Slot machine */
+.slot-num{display:inline-flex;align-items:center;letter-spacing:normal}
+.slot-digit{position:relative;display:inline-block;width:.72em;height:1em;overflow:hidden;vertical-align:top}
+.slot-reel{position:absolute;top:0;left:0;width:100%;display:flex;flex-direction:column;transition:transform .65s cubic-bezier(.18,.89,.32,1.05)}
+.slot-reel > span{display:block;width:100%;height:1em;line-height:1;text-align:center}
+.slot-comma{display:inline-flex;align-items:center;justify-content:center;width:.3em;height:1em}
+
+/* Sentiment stacked bar */
+.sent-bar{display:flex;height:9px;border-radius:5px;overflow:hidden;background:#eef0f3;margin:0 0 12px;gap:3px}
+.sent-seg{height:100%;transition:flex-basis .65s cubic-bezier(.2,.8,.3,1);flex:0 0 0%;min-width:0;border-radius:3px}
+.sent-seg.pos{background:var(--green)}
+.sent-seg.neu{background:var(--yellow)}
+.sent-seg.neg{background:var(--red)}
+.sent-legend{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.sl-item{display:flex;flex-direction:column;gap:3px}
+.sl-row{display:flex;align-items:baseline;gap:5px}
+.sl-top{display:flex;align-items:center;gap:5px}
+.sl-dot{width:6px;height:6px;border-radius:2px;flex-shrink:0}
+.sl-l{font-size:10px;color:var(--t2);font-weight:600;letter-spacing:.04em}
+.sl-v{font-size:clamp(17px,3.6vh,34px);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.sl-pct{font-size:10px;color:var(--t3);font-weight:600;font-variant-numeric:tabular-nums}
+.sl-item.pos .sl-dot{background:var(--green)}.sl-item.pos .sl-v{color:var(--green)}
+.sl-item.neu .sl-dot{background:var(--yellow)}.sl-item.neu .sl-v{color:var(--yellow)}
+.sl-item.neg .sl-dot{background:var(--red)}.sl-item.neg .sl-v{color:var(--red)}
+
+/* 2-col grid */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* Rating dist */
+.rat-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px}
+.rat-star{font-weight:700;color:var(--yellow);width:26px;display:flex;align-items:center;gap:3px}
+.rat-trk{flex:1;height:5px;background:#f3f3f4;border-radius:3px;overflow:hidden}
+.rat-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--teal));transition:width .5s}
+.rat-ct{width:24px;text-align:right;font-size:10px;color:var(--t3);font-weight:600}
+
+/* Industry */
+.ind-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.ind-nm{width:52px;font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ind-trk{flex:1;height:5px;background:#f3f3f4;border-radius:3px;overflow:hidden}
+.ind-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--green));transition:width .5s}
+.ind-ct{font-size:10px;color:var(--t3);width:22px;text-align:right;font-weight:600}
+.ind-rt{font-size:9px;color:var(--yellow);font-weight:700;min-width:26px;text-align:right;flex-shrink:0}
+
+/* Top companies */
+.tco-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;overflow:hidden}
+.tco-rk{font-size:10px;font-weight:700;color:var(--t3);width:14px;flex-shrink:0}
+.tco-rk.r1{color:var(--green)}
+.tco-nm{flex:1;font-size:11px;color:var(--t1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tco-nm.swap-up{animation:tco-up 1.1s cubic-bezier(.2,.8,.3,1)}
+.tco-nm.swap-down{animation:tco-down 1.1s cubic-bezier(.2,.8,.3,1)}
+@keyframes tco-up{0%{transform:translateY(110%);opacity:0}40%{opacity:1}100%{transform:translateY(0);opacity:1}}
+@keyframes tco-down{0%{transform:translateY(-110%);opacity:0}40%{opacity:1}100%{transform:translateY(0);opacity:1}}
+.tco-ct{font-size:11px;font-weight:700;color:var(--t2)}
+.tco-score{font-size:9px;color:var(--yellow);font-weight:700;flex-shrink:0}
+.tco-rev{font-size:9px;color:var(--t3);font-weight:600;flex-shrink:0;margin:0 2px}
+.tco-ch{font-size:9px;font-weight:700;flex-shrink:0;width:26px;text-align:right}
+.tco-ch.up{color:var(--green)}.tco-ch.dn{color:var(--red)}.tco-ch.eq{color:var(--t3)}
+.tco-row.tco-empty .tco-nm,.tco-row.tco-empty .tco-ct,.tco-row.tco-empty .tco-rk{color:#d8d9dc}
+
+/* Rolling scroll animation */
+@keyframes ind-scroll{to{transform:translateY(var(--scroll-h,0px))}}
+@keyframes tco-scroll{to{transform:translateY(var(--tco-scroll-h,0px))}}
+
+/* Review type badge */
+.type-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;letter-spacing:.02em;margin-right:4px;flex-shrink:0;vertical-align:middle}
+.type-badge.general{background:rgba(0,194,116,.12);color:var(--green)}
+.type-badge.interview{background:rgba(28,189,163,.12);color:var(--teal)}
+.type-badge.salary{background:rgba(240,181,0,.15);color:#b88a00}
+.type-badge.benefit{background:rgba(82,60,195,.12);color:var(--purple)}
+.type-badge.premium{background:rgba(100,181,246,.15);color:#1976d2}
+
+/* Region list */
+.rrow{display:grid;grid-template-columns:18px 1fr auto auto;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid rgba(229,230,233,.4);position:relative}
+.r-avg{font-size:11px;font-weight:600;color:var(--t3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrk{font-size:10px;font-weight:700;color:var(--t3)}
+.rrk.k1{color:var(--green)}
+.rnm{font-size:12px;color:var(--t1);font-weight:500}
+.rvc{font-size:12px;font-weight:700;color:var(--t1)}
+.rbar{position:absolute;bottom:0;left:26px;right:0;height:2px;background:linear-gradient(90deg,var(--green),rgba(0,194,116,.15));transform-origin:left center;transform:scaleX(0);transition:transform .5s}
+
+/* Best/worst */
+.bw-row{margin-bottom:0}
+.bw-co{font-size:13px;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
+.bw-rt{font-size:12px;font-weight:700;display:flex;align-items:center;gap:2px}
+.bw-co.bw-swap,.bw-rt.bw-swap{animation:bw-swap .9s cubic-bezier(.2,.8,.3,1)}
+@keyframes bw-swap{0%{opacity:0;transform:translateY(-10px)}55%{opacity:1}100%{opacity:1;transform:translateY(0)}}
+.best .bw-rt{color:var(--green)}.worst .bw-rt{color:var(--red)}
+
+/* FEED */
+.feed-hd{padding:14px 16px;border-bottom:1px solid rgba(229,230,233,.6);flex-shrink:0}
+.feed-tr{display:flex;justify-content:space-between;align-items:baseline}
+.feed-tt{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.14em}
+.feed-ct{font-size:20px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.feed-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:9px 12px;display:flex;flex-direction:column;gap:6px}
+.feed-list::-webkit-scrollbar{width:3px}
+.feed-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.fi{position:relative;background:#fff;border:1px solid rgba(229,230,233,.7);border-radius:6px;padding:9px 12px 9px 14px;animation:fi-in .8s cubic-bezier(.2,.7,.3,1);overflow:hidden;flex-shrink:0}
+.fi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--yellow);pointer-events:none}
+.fi.r-high::before{background:var(--green)}.fi.r-low::before{background:var(--red)}
+@keyframes fi-in{from{transform:translateX(28px)}to{transform:translateX(0)}}
+.fi-meta{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:10px}
+.fi-time{color:var(--t3)}.fi-reg{color:#242628;font-weight:700}.fi-rt{margin-left:auto;font-weight:700;color:var(--yellow)}
+.fi.r-high .fi-rt{color:var(--green)}.fi.r-low .fi-rt{color:var(--red)}
+.fi-co{font-size:12px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.fi-ind{font-size:9px;color:var(--t3);letter-spacing:.05em;margin-bottom:3px}
+.fi-txt{font-size:11px;color:var(--t2);line-height:1.4}
+.fi-txt::before{content:'"';color:var(--t3)}.fi-txt::after{content:'"';color:var(--t3)}
+.feed-empty{text-align:center;padding:24px;color:var(--t3);font-size:11px}
+
+/* PULSE MARKERS — click pop */
+.pulse-marker{position:relative;width:16px;height:16px}
+.pd{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;z-index:2;animation:pd-pop .42s cubic-bezier(.2,.85,.3,1.1) both}
+.pd.r-high{background:var(--green);box-shadow:0 0 10px rgba(0,194,116,.7),0 0 0 2px rgba(0,194,116,.3)}
+.pd.r-mid{background:var(--yellow);box-shadow:0 0 10px rgba(240,181,0,.7),0 0 0 2px rgba(240,181,0,.3)}
+.pd.r-low{background:var(--red);box-shadow:0 0 10px rgba(244,67,54,.7),0 0 0 2px rgba(244,67,54,.3)}
+@keyframes pd-pop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0)}
+  60%{transform:translate(-50%,-50%) scale(1.35)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+.heat-dot{width:8px;height:8px;border-radius:50%;transform:translate(-4px,-4px)}
+.heat-dot.r-high{background:rgba(0,194,116,.7);box-shadow:0 0 6px rgba(0,194,116,.5)}
+.heat-dot.r-mid{background:rgba(240,181,0,.7);box-shadow:0 0 6px rgba(240,181,0,.5)}
+.heat-dot.r-low{background:rgba(244,67,54,.7);box-shadow:0 0 6px rgba(244,67,54,.5)}
+
+/* TYPING CARDS */
+.tc-wrap{position:absolute}
+.tc-dot{position:absolute;width:12px;height:12px;border-radius:50%;top:-6px;left:-6px;z-index:3;animation:tc-dot-pulse 1.2s ease-out infinite}
+@keyframes tc-dot-pulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.tc-conn{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:1}
+.tc-conn polyline{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:var(--len);stroke-dasharray:var(--len);animation:line-draw .55s cubic-bezier(.4,0,.2,1) .3s forwards;opacity:.9}
+@keyframes line-draw{to{stroke-dashoffset:0}}
+.tc-card{
+  position:absolute;min-width:140px;
+  background:linear-gradient(135deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.84) 100%);
+  border-radius:16px;padding:14px 16px;
+  box-shadow:0 16px 44px rgba(60,70,90,.2),0 4px 12px rgba(60,70,90,.1),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(255,255,255,.45);
+  border:1px solid rgba(255,255,255,.9);
+  z-index:2;
+  animation:tcin .3s ease .85s both
+}
+@keyframes tcin{from{opacity:0}to{opacity:1}}
+.tc-fade{animation:tcout .25s linear forwards!important}
+@keyframes tcout{from{opacity:1}to{opacity:0}}
+.tc-meta{display:flex;align-items:center;gap:6px;margin-bottom:9px}
+.tc-reg{font-size:10px;color:#6f747c;font-weight:600;letter-spacing:.05em}
+.tc-bar{width:1px;height:9px;background:#ccd0d7;border-radius:1px}
+.tc-ind{font-size:10px;color:#6f747c;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.tc-co{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;white-space:nowrap;letter-spacing:-.01em}
+.tc-star{display:flex;align-items:center;line-height:1;font-size:15px;font-weight:700;margin-bottom:10px}
+.tc-star .jp-star-solid{vertical-align:0}
+.tc-star .stars-row{font-size:12px;transform:translateY(-1.5px)}
+.tc-body{font-size:13px;color:#45484d;line-height:1.55;min-height:16px;white-space:nowrap}
+.tc-cursor{display:inline-block;color:var(--green);font-weight:700;animation:cb .5s step-end infinite}
+@keyframes cb{0%,100%{opacity:1}50%{opacity:0}}
+.tc-emoji{display:inline-block;margin-left:5px;font-size:13px;line-height:1;animation:em-pop .4s cubic-bezier(.2,.8,.3,1)}
+@keyframes em-pop{0%{transform:scale(0);opacity:0}55%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
+
+/* FANFARE — 5-star review */
+.confetti{position:absolute;width:4px;height:5.3px;border-radius:.65px;margin:-2.65px 0 0 -2px;pointer-events:none;z-index:700;animation:cfly 1.6s cubic-bezier(.22,.61,.36,1) forwards}
+@keyframes cfly{
+  0%{transform:translate(0,0) rotate(0);opacity:1}
+  35%{opacity:1}
+  100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot));opacity:0}
+}
+.fanfare-ring{position:absolute;width:18px;height:18px;border-radius:50%;margin:-9px 0 0 -9px;border:3px solid var(--green);pointer-events:none;z-index:680;animation:fring 1s cubic-bezier(.15,.7,.4,1) forwards}
+.shine-burst{position:absolute;width:80px;height:80px;border-radius:50%;margin:-40px 0 0 -40px;pointer-events:none;z-index:670;background:radial-gradient(circle,rgba(255,255,200,.95) 0%,rgba(255,236,140,.6) 25%,rgba(0,194,116,.25) 55%,transparent 75%);animation:shine-pop 1.1s cubic-bezier(.15,.7,.4,1) forwards;mix-blend-mode:screen}
+@keyframes shine-pop{0%{transform:scale(.15);opacity:0}25%{opacity:1}100%{transform:scale(3.5);opacity:0}}
+@keyframes fring{
+  0%{transform:scale(.4);opacity:.95;border-width:3px}
+  100%{transform:scale(7);opacity:0;border-width:1px}
+}
+.raindrop{position:absolute;width:1.5px;height:13px;background:linear-gradient(180deg,transparent,#5b6677);border-radius:1px;pointer-events:none;z-index:680;animation:rainfall .8s linear forwards;opacity:.5}
+.storm-cloud{position:absolute;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,rgba(58,68,88,.7),rgba(72,82,102,.45) 50%,transparent 76%);pointer-events:none;z-index:678;filter:blur(8px);animation:cloud-in 1s ease-out both,cloud-drift 7s ease-in-out 1s infinite alternate;transition:filter .13s ease-out}
+.storm-cloud.lit{filter:blur(8px) brightness(2.3)}
+@keyframes cloud-in{from{opacity:0;transform:translateX(-50px) scale(.85)}to{opacity:.9;transform:translateX(0) scale(1)}}
+@keyframes cloud-drift{0%{transform:translateX(-40px)}100%{transform:translateX(40px)}}
+.storm-flash{position:absolute;width:260px;height:210px;border-radius:50%;margin:-105px 0 0 -130px;background:radial-gradient(circle,rgba(234,240,252,.78),rgba(200,213,240,.24) 42%,transparent 72%);pointer-events:none;z-index:677;filter:blur(22px);animation:storm-flash .62s ease-out forwards}
+@keyframes storm-flash{0%{opacity:0}14%{opacity:.9}34%{opacity:.42}52%{opacity:.78}100%{opacity:0}}
+@keyframes rainfall{
+  0%{transform:translateY(-30px);opacity:0}
+  15%{opacity:.65}
+  85%{opacity:.6}
+  100%{transform:translateY(140px);opacity:0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hd">
+    <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1919.2277 410.9862"><path d="M1610.175,184.1682c8.6074-29.1567,34.391-50.4038,64.7885-50.4038s57.1116,18.8044,65.215,50.4038h-130.0034ZM1674.9634,85.299c-57.1888,0-104.724,42.6495-114.4558,98.8692-1.2018,6.9403-1.8608,14.0356-1.8608,21.3248s.6591,14.3845,1.8608,21.3247c9.7319,56.2198,57.2668,98.8693,114.4558,98.8693,41.1375,0,79.173-17.5638,104.22-47.3409l-42.1842-25.3183c-15.0437,15.7415-37.299,26.21-62.0358,25.1631-30.3586-1.2795-56.181-22.2165-64.7885-51.412h179.2443c1.202-6.9402,1.8611-14.0356,1.8611-21.3247s-.6591-14.3845-1.8611-21.3247c-9.7319-56.2198-57.2667-98.8693-114.4558-98.8693v.0388h0Z"/><path d="M1919.2277,141.5189v-46.5266h-42.6494v-38.8886l-50.4041-9.5767v48.4654h-27.1406v46.5266h27.1406v123.3346c0,32.4912,22.7981,51.761,50.0938,57.6156,18.0291,3.8772,32.0646,3.1405,42.9597,3.1405v-49.8999s-12.0581,1.0081-22.9919-1.7447c-13.2601-3.3345-19.6573-10.5074-19.6573-24.0389v-108.4073h42.6494Z"/><path d="M93.0535,224.8793c0,25.706-20.8208,46.5267-46.5267,46.5267H0v54.2811h46.5267c55.677,0,100.8079-45.1309,100.8079-100.8079V18.1068l-54.2811-10.3522v217.1247Z"/><path d="M294.6713,275.2833c-38.5008,0-69.7901-31.328-69.7901-69.7901s31.2892-69.7901,69.7901-69.7901,69.7901,31.328,69.7901,69.7901-31.2892,69.7901-69.7901,69.7901ZM294.6713,85.2992c-66.3781,0-120.194,53.8159-120.194,120.194s53.8159,120.194,120.194,120.194,120.194-53.8159,120.194-120.194-53.816-120.194-120.194-120.194Z"/><path d="M558.322,275.283c-38.5008,0-69.7902-31.3279-69.7902-69.79s31.2893-69.7901,69.7902-69.7901,69.79,31.3279,69.79,69.7901-31.2892,69.79-69.79,69.79ZM558.322,85.299c-24.3489,0-46.9919,7.2504-65.9129,19.6963V10.3522L438.128,0v325.687h54.2811v-19.6963c18.921,12.4459,41.5639,19.6963,65.9129,19.6963,66.3781,0,120.194-53.8159,120.194-120.194s-53.816-120.194-120.194-120.194Z"/><polygon points="969.3083 325.687 1023.5895 325.687 1023.5895 10.3522 969.3083 0 969.3083 325.687"/><path d="M1167.0469,275.2833c-38.5009,0-69.7902-31.328-69.7902-69.7901s31.2893-69.7901,69.7902-69.7901,69.79,31.328,69.79,69.7901-31.2892,69.7901-69.79,69.7901ZM1236.8369,107.6708c-19.6962-14.0743-43.7739-22.3716-69.79-22.3716-66.3781,0-120.194,53.8159-120.194,120.194s53.816,120.194,120.194,120.194c26.0161,0,50.0938-8.2972,69.79-22.3716v22.3716h50.4041V85.2992h-50.4041v22.3716Z"/><path d="M1431.5526,89.1764h-1.7061c-17.9515,0-34.8176,4.5364-49.551,12.5622v-16.4394h-54.2811v240.388h52.3425v-133.7643c0-28.9241,23.4186-52.3426,52.3427-52.3426s52.3425,23.4185,52.3425,52.3426v133.7643h52.3425v-132.6787c0-57.3442-46.4879-103.8321-103.832-103.8321Z"/><path d="M825.8501,275.2833c-38.5008,0-69.7902-31.328-69.7902-69.7901s31.2893-69.7901,69.7902-69.7901,69.79,31.328,69.79,69.7901-31.2892,69.7901-69.79,69.7901ZM825.8501,85.2992c-24.3489,0-46.9919,7.2505-65.9129,19.6963v-19.6963h-54.2811v325.687h54.2811v-104.9953c18.921,12.4458,41.5639,19.6963,65.9129,19.6963,66.3781,0,120.194-53.8159,120.194-120.194s-53.816-120.194-120.194-120.194Z"/></svg></div>
+    <div class="hdiv"></div>
+    <span class="hd-title">Review Pulse</span>
+    <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
+    <div class="ticker">
+      <div class="ti"><span class="ti-l">AVG RATING</span><span class="ti-v" id="t-avg">—</span></div>
+      <div class="ti"><span class="ti-l">PER MIN</span><span class="ti-v" id="t-rate">0</span></div>
+      <div class="ti"><span class="ti-l">NOW</span><span class="ti-v" id="t-clock">00:00</span></div>
+    </div>
+  </header>
+
+  <aside class="lp">
+    <div class="lp-fit">
+    <div class="card cum-card">
+      <div class="ct">총 누적 리뷰 <span class="cum-meta" id="cum-days"></span></div>
+      <div class="slot-num cum-num" id="cum-num"></div>
+    </div>
+
+    <div class="card total-card">
+      <div class="ct">Total Reviews <span class="ct-meta" id="review-date">실시간 세션</span></div>
+      <div class="slot-num total-num" id="total-num"></div>
+      <div class="sent-bar">
+        <div class="sent-seg pos" id="sb-pos"></div>
+        <div class="sent-seg neu" id="sb-neu"></div>
+        <div class="sent-seg neg" id="sb-neg"></div>
+      </div>
+      <div class="sent-legend">
+        <div class="sl-item pos">
+          <div class="sl-top"><span class="sl-dot"></span><span class="sl-l">긍정</span><span class="sl-pct" id="sp-pos">(0%)</span></div>
+          <div class="sl-v" id="s-pos">0</div>
+        </div>
+        <div class="sl-item neu">
+          <div class="sl-top"><span class="sl-dot"></span><span class="sl-l">중립</span><span class="sl-pct" id="sp-neu">(0%)</span></div>
+          <div class="sl-v" id="s-neu">0</div>
+        </div>
+        <div class="sl-item neg">
+          <div class="sl-top"><span class="sl-dot"></span><span class="sl-l">부정</span><span class="sl-pct" id="sp-neg">(0%)</span></div>
+          <div class="sl-v" id="s-neg">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="ct">평점 분포</div>
+        <div id="rat-grid"></div>
+      </div>
+      <div class="card">
+        <div class="ct">업종별</div>
+        <div id="ind-list"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">Top 기업 <span class="ct-meta" id="co-total">0개 기업</span><span class="ct-basis">리뷰탭 PV 기준</span></div>
+      <div id="top-co"></div>
+    </div>
+
+    <div class="card region-card">
+      <div class="ct">연령별 리뷰</div>
+      <div id="age-list"></div>
+    </div>
+
+    <div class="card career-card">
+      <div class="ct">연차 분포</div>
+      <div class="donut-wrap">
+        <div class="donut" id="donut"></div>
+        <div class="donut-legend" id="donut-legend"></div>
+      </div>
+    </div>
+    </div>
+  </aside>
+
+  <main class="mp">
+    <div id="map"></div>
+    <div id="rc-layer"></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const LAUNCH_DATE=new Date('2014-11-01');
+const CAREERS=[
+  {label:'신입',weight:20,color:'#64b5f6'},
+  {label:'1~2년',weight:34,color:'#00C274'},
+  {label:'4~7년',weight:30,color:'#FFB74D'},
+  {label:'8년 이상',weight:16,color:'#CE93D8'},
+];
+const AGES=[
+  {label:'20-24세',weight:12},{label:'25-29세',weight:28},{label:'30-34세',weight:26},
+  {label:'35-39세',weight:18},{label:'40-44세',weight:10},{label:'45세 이상',weight:6},
+];
+const REGIONS=[
+  {code:'SEL',name:'서울',lat:37.5665,lon:126.978,weight:28},
+  {code:'GGD',name:'경기',lat:37.2636,lon:127.0286,weight:22},
+  {code:'ICN',name:'인천',lat:37.4563,lon:126.7052,weight:7},
+  {code:'BSN',name:'부산',lat:35.1796,lon:129.0756,weight:8},
+  {code:'DGU',name:'대구',lat:35.8714,lon:128.6014,weight:5},
+  {code:'DJN',name:'대전',lat:36.3504,lon:127.3845,weight:4},
+  {code:'GJU',name:'광주',lat:35.1595,lon:126.8526,weight:3},
+  {code:'ULS',name:'울산',lat:35.5384,lon:129.3114,weight:3},
+  {code:'SEJ',name:'세종',lat:36.48,lon:127.289,weight:2},
+  {code:'GWD',name:'강원',lat:37.8813,lon:127.7298,weight:3},
+  {code:'CBD',name:'충북',lat:36.6424,lon:127.489,weight:3},
+  {code:'CND',name:'충남',lat:36.5184,lon:126.8,weight:3},
+  {code:'JBD',name:'전북',lat:35.8242,lon:127.148,weight:2},
+  {code:'JND',name:'전남',lat:34.8679,lon:126.991,weight:2},
+  {code:'GBD',name:'경북',lat:36.4919,lon:128.8889,weight:2},
+  {code:'GND',name:'경남',lat:35.228,lon:128.6811,weight:2},
+  {code:'JJU',name:'제주',lat:33.4996,lon:126.5312,weight:1},
+];
+const COMPANIES=[
+  {name:'삼성전자',industry:'IT/반도체'},{name:'LG전자',industry:'전자/가전'},
+  {name:'SK하이닉스',industry:'IT/반도체'},{name:'네이버',industry:'IT서비스'},
+  {name:'카카오',industry:'IT서비스'},{name:'쿠팡',industry:'이커머스'},
+  {name:'현대자동차',industry:'자동차'},{name:'기아',industry:'자동차'},
+  {name:'배달의민족',industry:'IT서비스'},{name:'토스',industry:'핀테크'},
+  {name:'당근',industry:'IT서비스'},{name:'넥슨',industry:'게임'},
+  {name:'엔씨소프트',industry:'게임'},{name:'크래프톤',industry:'게임'},
+  {name:'하이브',industry:'엔터'},{name:'아모레퍼시픽',industry:'화장품'},
+  {name:'KT',industry:'통신'},{name:'SK텔레콤',industry:'통신'},
+  {name:'무신사',industry:'이커머스'},{name:'야놀자',industry:'IT서비스'},
+  {name:'롯데쇼핑',industry:'유통'},{name:'신세계',industry:'유통'},
+  {name:'포스코',industry:'철강/소재'},{name:'LG화학',industry:'화학'},
+  {name:'한국전력',industry:'에너지'},{name:'CJ제일제당',industry:'식품'},
+];
+const TITLES=['워라밸 괜찮은 편이에요','연봉은 업계 상위권','성장할 수 있는 환경','복지는 좋지만 업무강도가 쎔','팀바팀이 심함','신입 교육 체계 잘 되어있음','수직적인 문화가 아쉬워요','자유로운 분위기','시스템이 잘 갖춰져 있음','야근은 각오하세요','수평적 문화 진짜 좋음','보상 체계가 매력적','의사결정이 너무 느림','사내정치가 심한 편','인센티브가 쏠쏠함'];
+const RWTS=[{v:1,w:6},{v:2,w:10},{v:3,w:22},{v:4,w:35},{v:5,w:27}];
+const REVIEW_TYPE_WEIGHTS=[{v:'general_review',w:45},{v:'interview_review',w:25},{v:'salary_review',w:15},{v:'benefit_review',w:10},{v:'premium_review',w:5}];
+const TYPE_BADGE={
+  'general_review':'<span class="type-badge general">기업리뷰</span>',
+  'interview_review':'<span class="type-badge interview">면접리뷰</span>',
+  'salary_review':'<span class="type-badge salary">연봉정보</span>',
+  'benefit_review':'<span class="type-badge benefit">복지리뷰</span>',
+  'premium_review':'<span class="type-badge premium">프리미엄</span>',
+};
+const PROV_TO_CODE={
+  '서울특별시':'SEL','경기도':'GGD','인천광역시':'ICN','부산광역시':'BSN',
+  '대구광역시':'DGU','대전광역시':'DJN','광주광역시':'GJU','울산광역시':'ULS',
+  '세종특별자치시':'SEJ','강원도':'GWD','강원특별자치도':'GWD',
+  '충청북도':'CBD','충청남도':'CND','전라북도':'JBD','전북특별자치도':'JBD',
+  '전라남도':'JND','경상북도':'GBD','경상남도':'GND','제주특별자치도':'JJU'
+};
+
+const state={
+  total:0,ratingSum:0,ratingCount:0,ratingDist:{1:0,2:0,3:0,4:0,5:0},
+  regionCounts:{},ageCounts:{},ageRatingSum:{},ageRatingCount:{},careerCounts:{},careerRatingSum:{},careerRatingCount:{},sentimentCounts:{pos:0,neu:0,neg:0},recentRates:[],heatDots:[],
+  companyCounts:{},companyRatingSum:{},companyRatingCount:{},industryCounts:{},industryRatingSum:{},industryRatingCount:{},
+  feedItems:[],prevTopNames:[],
+};
+REGIONS.forEach(r=>state.regionCounts[r.code]=0);
+AGES.forEach(a=>{state.ageCounts[a.label]=0;state.ageRatingSum[a.label]=0;state.ageRatingCount[a.label]=0;});
+CAREERS.forEach(c=>{state.careerCounts[c.label]=0;state.careerRatingSum[c.label]=0;state.careerRatingCount[c.label]=0;});
+
+let cumBase=0;
+let serverDataLoaded=false;
+let serverTop50=[];
+let tcoRollTimer=null,indRollTimer=null,indTickerReady=false,tcoOffset=0,indOffset=0;
+let indData=[];
+const TCO_ROWS=8,IND_ROWS=5;
+let feedPool=[],feedIdx=0,feedDataLoaded=false;
+const provLayers={};
+
+function wpick(arr,wf){const t=arr.reduce((s,i)=>s+wf(i),0);let r=Math.random()*t;for(const i of arr){r-=wf(i);if(r<=0)return i}return arr[arr.length-1]}
+function pickRegion(){return wpick(REGIONS,r=>r.weight)}
+function pickRating(){return wpick(RWTS,x=>x.w).v}
+function jitter(lat,lon,km=18){const dLat=(Math.random()-.5)*(km/111);const dLon=(Math.random()-.5)*(km/(111*Math.cos(lat*Math.PI/180)));return[lat+dLat,lon+dLon]}
+function cityNameToRegion(cn){if(!cn)return null;const cd=PROV_TO_CODE[cn];return cd?REGIONS.find(r=>r.code===cd)||null:null}
+function compCityToRegion(cn){
+  if(!cn)return null;
+  const exact=PROV_TO_CODE[cn];if(exact)return REGIONS.find(r=>r.code===exact)||null;
+  const map=[['서울','SEL'],['경기','GGD'],['인천','ICN'],['부산','BUS'],['대구','DAG'],['광주','GWJ'],['대전','DJN'],['울산','USN'],['세종','SJG'],['강원','GWD'],['충북','CNB'],['충청북','CNB'],['충남','CNA'],['충청남','CNA'],['전북','JNB'],['전라북','JNB'],['전남','JND'],['전라남','JND'],['경북','GBD'],['경상북','GBD'],['경남','GND'],['경상남','GND'],['제주','JJU']];
+  for(const[pfx,code]of map){if(cn.startsWith(pfx))return REGIONS.find(r=>r.code===code)||null;}
+  return null;
+}
+function nearestRegion(lat,lon){let best=null,bestD=Infinity;for(const r of REGIONS){const d=(r.lat-lat)**2+(r.lon-lon)**2;if(d<bestD){bestD=d;best=r;}}return best;}
+function expYearToCareer(ey){if(ey==null)return null;if(ey<=0)return'신입';if(ey<=2)return'1~2년';if(ey<=7)return'4~7년';return'8년 이상'}
+function ageToLabel(age){if(!age||age<18)return null;if(age<=24)return'20-24세';if(age<=29)return'25-29세';if(age<=34)return'30-34세';if(age<=39)return'35-39세';if(age<=44)return'40-44세';return'45세 이상'}
+function genReviewFromFeedItem(item){
+  let lat,lon,region;
+  if(item.company_lat&&item.company_lng){
+    [lat,lon]=jitter(item.company_lat,item.company_lng,2);
+    region=nearestRegion(item.company_lat,item.company_lng);
+  }else{
+    region=compCityToRegion(item.company_city)||cityNameToRegion(item.city_name)||pickRegion();
+    [lat,lon]=jitter(region.lat,region.lon,10);
+  }
+  const review_type=item.review_type||wpick(REVIEW_TYPE_WEIGHTS,x=>x.w).v;
+  const hasRating=item.rating!=null&&review_type!=='premium_review'&&review_type!=='salary_review';
+  const rating=hasRating?Math.round(Math.max(1,Math.min(5,item.rating))):null;
+  const career=expYearToCareer(item.experience_year)||wpick(CAREERS,c=>c.weight).label;
+  const age=ageToLabel(item.user_age)||wpick(AGES,a=>a.weight).label;
+  const title=item.review_title||(review_type==='salary_review'?'연봉 정보 등록':TITLES[Math.floor(Math.random()*TITLES.length)]);
+  return{id:Date.now()+Math.random(),region,company:item.company_name||'기업명 없음',industry:item.industry||'기타',rating,hasRating,age,career,review_type,title,lat,lon,timestamp:new Date()};
+}
+function fmt(d){const p=n=>String(n).padStart(2,'0');return`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`}
+function rclass(r){return r>=4?'r-high':r===3?'r-mid':'r-low'}
+function sent(r){return r>=4?'pos':r===3?'neu':'neg'}
+function rcolor(r){return r>=4?'#00C274':r===3?'#F0B500':'#f44336'}
+function avgColor(v){return v>=4?'#00C274':v>=3?'#F0B500':'#f44336'}
+function starsHtml(rating,col){let h='';for(let i=1;i<=5;i++){const c=i<=rating?col:'#d8d9dc';h+=`<i class="jp-star-solid" style="color:${c}"></i>`}return h}
+
+/* ============ MAP ============ */
+const map=L.map('map',{preferCanvas:true,center:[36.2,127.7],zoom:7,minZoom:6,maxZoom:11,zoomControl:true,attributionControl:false,maxBounds:[[32.0,123.5],[39.5,132.0]],maxBoundsViscosity:.85});
+map.fitBounds([[33.0,124.5],[38.6,130.0]],{padding:[10,10]});
+Promise.all([
+  fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()),
+  fetch('https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_provinces_geo_simple.json').then(r=>r.json())
+]).then(([world,korea])=>{
+  function isKorea(f){const p=f.properties||{};const name=(p.ADMIN||p.NAME||p.name||p.SOVEREIGNT||'').toLowerCase();const iso=p.ISO_A3||p.iso_a3||p['ISO3166-1-Alpha-3']||'';return iso==='KOR'||name.includes('south korea')||name==='korea, republic of'||name==='korea';}
+  function isNorth(f){const p=f.properties||{};const name=(p.ADMIN||p.NAME||p.name||'').toLowerCase();const iso=p.ISO_A3||p.iso_a3||p['ISO3166-1-Alpha-3']||'';return iso==='PRK'||name.includes('north korea')||name.includes("dem. rep. korea");}
+  L.geoJSON(world,{filter:f=>!isKorea(f)&&!isNorth(f),style:()=>({fillColor:'#D1DCEB',fillOpacity:1,color:'#fff',weight:.7}),interactive:false}).addTo(map);
+  L.geoJSON(world,{filter:f=>isNorth(f),style:()=>({fillColor:'#C5D3E4',fillOpacity:1,color:'#fff',weight:.7}),interactive:false}).addTo(map);
+  L.geoJSON(korea,{
+    style:()=>({fillColor:'#00C274',fillOpacity:0.1,color:'#fff',weight:1.2}),
+    onEachFeature:(feature,layer)=>{
+      const props=feature.properties||{};
+      const pname=props.CTP_KOR_NM||props.name||props.NAME_1||'';
+      const code=PROV_TO_CODE[pname];
+      if(code)provLayers[code]=layer;
+    },
+    interactive:false
+  }).addTo(map);
+  lastProvUpdate=0;updateProvColors();
+});
+
+/* ============ PROVINCE DENSITY ============ */
+let lastProvUpdate=0;
+function updateProvColors(){
+  const now=Date.now();if(now-lastProvUpdate<3000)return;lastProvUpdate=now;
+  const vals=Object.values(state.regionCounts);
+  const maxCnt=Math.max(...vals,1);
+  const palette=['#00C274','#1ecd86','#3cd897','#5ce0a8','#7ce8b9','#9aeec9','#b6f3d7','#00ad68','#13b87a','#26c184','#3acc8e','#4dd697','#62dfa3','#79e6b0','#92ebbd','#abf0c9','#c4f4d5'];
+  Object.entries(provLayers).forEach(([code,layer])=>{
+    const cnt=state.regionCounts[code]||0;
+    const ratio=cnt/maxCnt;
+    const opacity=0.1+ratio*0.82;
+    layer.setStyle({fillColor:'#00C274',fillOpacity:opacity});
+  });
+}
+
+/* ============ SLOT MACHINE NUMBER ============ */
+function setSlotNumber(el,newValue){
+  const str=newValue.toLocaleString();const chars=str.split('');
+  const existing=Array.from(el.children);
+  const exMask=existing.map(c=>c.classList.contains('slot-comma')?',':'D').join('');
+  const newMask=chars.map(c=>c===','?',':'D').join('');
+  if(exMask!==newMask){
+    el.innerHTML='';
+    chars.forEach(c=>{
+      if(c===','){const s=document.createElement('span');s.className='slot-comma';s.textContent=',';el.appendChild(s);}
+      else{const wrap=document.createElement('span');wrap.className='slot-digit';const reel=document.createElement('span');reel.className='slot-reel';for(let i=0;i<=9;i++){const d=document.createElement('span');d.textContent=i;reel.appendChild(d);}wrap.appendChild(reel);el.appendChild(wrap);}
+    });
+  }
+  let charIdx=0,digitIdx=0;
+  Array.from(el.children).forEach(child=>{
+    if(child.classList.contains('slot-comma')){charIdx++;return;}
+    const digit=parseInt(chars[charIdx]);const reel=child.querySelector('.slot-reel');
+    reel.style.transitionDuration=`${0.5+digitIdx*0.07}s`;reel.style.transform=`translateY(-${digit*10}%)`;
+    charIdx++;digitIdx++;
+  });
+}
+
+/* ============ CUMULATIVE DISPLAY ============ */
+function updateCumDisplay(){
+  const el=document.getElementById('cum-num');
+  if(el)setSlotNumber(el,cumBase+state.total);
+  const daysEl=document.getElementById('cum-days');
+  if(daysEl){
+    const days=Math.floor((Date.now()-LAUNCH_DATE.getTime())/86400000);
+    const years=Math.floor(days/365);const months=Math.floor((days%365)/30);
+    daysEl.textContent=`서비스 시작 ${days.toLocaleString()}일 (${years}년 ${months}개월)`;
+  }
+}
+
+/* ============ SERVER DATA ============ */
+function loadServerData(){
+  fetch('/api/reviews').then(r=>r.json()).then(data=>{
+    if(data.totalApproved){cumBase=data.totalApproved;updateCumDisplay();}
+    const dateEl=document.getElementById('review-date');
+    if(dateEl)dateEl.textContent='기준: '+(data.feedDate||'—');
+    if(Array.isArray(data.feed)&&data.feed.length>0){
+      feedPool=data.feed.slice().sort(()=>Math.random()-.5);
+      feedIdx=0;
+      feedDataLoaded=true;
+      lastProvUpdate=0;
+      for(let i=0;i<8;i++)setTimeout(()=>handleReview(genReview()),i*220);
+      setTimeout(schedule,8*220+500);
+    }
+  }).catch(()=>{updateCumDisplay();});
+  fetch('/api/mtd').then(r=>r.json()).then(data=>{
+    if(Array.isArray(data.top50)&&data.top50.length>0){serverTop50=data.top50;serverDataLoaded=true;renderServerTop50();}
+  }).catch(()=>{});
+}
+
+/* ============ INDUSTRY PANEL (throttled, ticker slide if >IND_ROWS) ============ */
+let lastIndUpdate=0;
+function buildIndRow([nm,ct]){
+  const maxI=indData.length>0?indData[0][1]||1:1;
+  const rSum=state.industryRatingSum[nm]||0;const rCnt=state.industryRatingCount[nm]||0;
+  const avgR=rCnt>0?(rSum/rCnt).toFixed(1):'—';
+  const avgCol=rCnt>0?avgColor(parseFloat(avgR)):'var(--yellow)';
+  return`<div class="ind-row"><span class="ind-nm">${nm}</span><div class="ind-trk"><div class="ind-fill" style="width:${(ct/maxI)*100}%"></div></div><span class="ind-ct">${ct}</span><span class="ind-rt" style="color:${avgCol}">${avgR}★</span></div>`;
+}
+function updateIndustryPanel(){
+  const now=Date.now();if(now-lastIndUpdate<3000)return;lastIndUpdate=now;
+  const il=document.getElementById('ind-list');if(!il)return;
+  const sorted=Object.entries(state.industryCounts).sort((a,b)=>b[1]-a[1]);
+  if(sorted.length===0)return;
+  indData=sorted;
+  if(indTickerReady)return;
+  if(sorted.length>IND_ROWS){
+    let iOff=0;
+    il.style.minHeight='0';il.style.overflow='hidden';il.style.justifyContent='flex-start';
+    delete il.dataset.fixedH;
+    const n0=Math.min(IND_ROWS+1,sorted.length);
+    const initRows=[];for(let i=0;i<n0;i++)initRows.push(buildIndRow(sorted[i]));
+    il.style.height='';
+    il.innerHTML=`<div style="display:flex;flex-direction:column">${initRows.join('')}</div>`;
+    requestAnimationFrame(()=>{
+      const wrap=il.firstElementChild;if(!wrap)return;
+      const firstRow=wrap.firstElementChild;
+      const rowH=firstRow?firstRow.offsetHeight:24;
+      il.style.height=(rowH*IND_ROWS)+'px';
+      indTickerReady=true;
+      indRollTimer=setInterval(()=>{
+        const w=il.firstElementChild;if(!w)return;
+        w.style.transition='transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94)';
+        w.style.transform=`translateY(-${rowH}px)`;
+        setTimeout(()=>{
+          w.style.transition='none';
+          w.style.transform='translateY(0)';
+          if(w.firstElementChild)w.removeChild(w.firstElementChild);
+          iOff=(iOff+1)%indData.length;
+          const nextIdx=(iOff+IND_ROWS)%indData.length;
+          w.insertAdjacentHTML('beforeend',buildIndRow(indData[nextIdx]));
+        },580);
+      },2800);
+    });
+  }else{
+    il.style.opacity='1';il.style.transition='';
+    il.style.overflow='';il.style.justifyContent='';il.style.height='';il.style.minHeight='';
+    delete il.dataset.fixedH;
+    il.innerHTML=sorted.map(buildIndRow).join('');
+  }
+}
+
+/* ============ TOP 50 COMPANIES (server MTD, ticker slide if >TCO_ROWS) ============ */
+function renderServerTop50(){
+  const tl=document.getElementById('top-co');if(!tl||serverTop50.length===0)return;
+  if(tcoRollTimer){clearInterval(tcoRollTimer);tcoRollTimer=null;}
+  const coTotalEl=document.getElementById('co-total');
+  if(coTotalEl)coTotalEl.textContent=`${serverTop50.length}개 기업 MTD`;
+  function buildRowHtml(co){
+    const rkCls=co.rank===1?'r1':'';
+    const chVal=typeof co.rank_change==='number'?co.rank_change:0;
+    let chHtml='';
+    if(chVal>0)chHtml=`<span class="tco-ch up">▲${chVal}</span>`;
+    else if(chVal<0)chHtml=`<span class="tco-ch dn">▼${Math.abs(chVal)}</span>`;
+    else chHtml=`<span class="tco-ch eq">—</span>`;
+    const avg=co.avg_score!=null?Number(co.avg_score).toFixed(1):'—';
+    const avgCol=co.avg_score!=null?avgColor(Number(co.avg_score)):'var(--yellow)';
+    const revCnt=co.review_cnt||0;
+    return`<div class="tco-row"><span class="tco-rk ${rkCls}">${co.rank}</span><span class="tco-nm">${co.company_name}</span><span class="tco-score" style="color:${avgCol}">${avg}★</span><span class="tco-rev">${revCnt}건</span>${chHtml}</div>`;
+  }
+  tcoOffset=0;
+  tl.style.minHeight='0';tl.style.overflow='hidden';tl.style.justifyContent='flex-start';
+  const n0=Math.min(TCO_ROWS+1,serverTop50.length);
+  const initRows=[];for(let i=0;i<n0;i++)initRows.push(buildRowHtml(serverTop50[i]));
+  tl.style.height='';
+  tl.innerHTML=`<div style="display:flex;flex-direction:column">${initRows.join('')}</div>`;
+  if(serverTop50.length>TCO_ROWS){
+    requestAnimationFrame(()=>{
+      const wrap=tl.firstElementChild;if(!wrap)return;
+      const firstRow=wrap.firstElementChild;
+      const rowH=firstRow?firstRow.offsetHeight:28;
+      tl.style.height=(rowH*TCO_ROWS)+'px';
+      setTimeout(fitLeftPanel,100);
+      tcoRollTimer=setInterval(()=>{
+        const w=tl.firstElementChild;if(!w)return;
+        w.style.transition='transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94)';
+        w.style.transform=`translateY(-${rowH}px)`;
+        setTimeout(()=>{
+          w.style.transition='none';
+          w.style.transform='translateY(0)';
+          if(w.firstElementChild)w.removeChild(w.firstElementChild);
+          tcoOffset=(tcoOffset+1)%serverTop50.length;
+          const nextIdx=(tcoOffset+TCO_ROWS)%serverTop50.length;
+          w.insertAdjacentHTML('beforeend',buildRowHtml(serverTop50[nextIdx]));
+        },580);
+      },2800);
+    });
+  }
+}
+
+/* ============ TYPING CARDS WITH OVERLAP PREVENTION ============ */
+const activeCards=[];const cardQueue=[];const MAX_ACTIVE=8;const CARD_LIFE=6000;const QUEUE_MAX=25;let cardZ=100;
+function rectsOverlap(a,b,pad=10){return !(a.x+a.w+pad<b.x||b.x+b.w+pad<a.x||a.y+a.h+pad<b.y||b.y+b.h+pad<a.y)}
+function findCardPosition(rv){
+  const mapEl=document.getElementById('map');const mapRect=mapEl.getBoundingClientRect();
+  const pt=map.latLngToContainerPoint(L.latLng(rv.lat,rv.lon));
+  const CW=300,CH=140,PAD=12;
+  const offsets=[{ox:120,oy:-40},{ox:-120-CW,oy:-40},{ox:200,oy:-40},{ox:-200-CW,oy:-40},{ox:300,oy:-40},{ox:-300-CW,oy:-40},{ox:120,oy:-40-CH-30},{ox:120,oy:-40+CH+30},{ox:-120-CW,oy:-40-CH-30},{ox:-120-CW,oy:-40+CH+30},{ox:200,oy:-40-CH-30},{ox:200,oy:-40+CH+30},{ox:-200-CW,oy:-40-CH-30},{ox:-200-CW,oy:-40+CH+30},{ox:300,oy:-40-CH-30},{ox:300,oy:-40+CH+30},{ox:-300-CW,oy:-40-CH-30},{ox:-300-CW,oy:-40+CH+30},{ox:-CW/2,oy:-40-CH-30},{ox:-CW/2,oy:-40+CH+30},{ox:-CW/2,oy:-40-CH-110},{ox:-CW/2,oy:-40+CH+110}];
+  for(const o of offsets){
+    const x=pt.x+o.ox;const y=pt.y+o.oy;
+    if(x<PAD||x+CW>mapRect.width-PAD)continue;if(y<PAD||y+CH>mapRect.height-PAD)continue;
+    const rect={x,y,w:CW,h:CH};let collide=false;
+    for(const ac of activeCards){if(rectsOverlap(rect,ac.bounds)){collide=true;break;}}
+    if(!collide)return{x,y,dotX:pt.x,dotY:pt.y};
+  }
+  return null;
+}
+function showTypingCard(rv){
+  if(activeCards.length>=MAX_ACTIVE){if(cardQueue.length<QUEUE_MAX)cardQueue.push(rv);return;}
+  const pos=findCardPosition(rv);if(!pos){if(cardQueue.length<QUEUE_MAX)cardQueue.push(rv);return;}
+  renderTypingCard(rv,pos);
+}
+function renderTypingCard(rv,pos){
+  const CW=300,CH=140;
+  const col=rv.hasRating&&rv.rating!=null?rcolor(rv.rating):'#8B8FA8';
+  const stars=rv.hasRating&&rv.rating!=null?starsHtml(rv.rating,col):'';
+  const ratingHtml=rv.hasRating&&rv.rating!=null?`<div class="tc-star" style="color:${col}">${rv.rating}.0<span class="stars-row">${stars}</span></div>`:'';
+  const uid=`tc${Date.now()}${Math.floor(Math.random()*9999)}`;
+  const wrap=document.createElement('div');wrap.className='tc-wrap';cardZ++;
+  wrap.style.cssText=`left:${pos.dotX}px;top:${pos.dotY}px;z-index:${cardZ}`;
+  const offX=pos.x-pos.dotX;const offY=pos.y-pos.dotY;
+  const badge=TYPE_BADGE[rv.review_type]||'';
+  wrap.innerHTML=`<div class="tc-dot" style="background:${col};box-shadow:0 0 10px ${col}80"></div><div class="tc-card" style="left:${offX}px;top:${offY}px"><div class="tc-meta">${badge}<span class="tc-reg">${rv.region.name}</span><span class="tc-bar"></span><span class="tc-ind">${rv.industry}</span></div><div class="tc-co">${rv.company}</div>${ratingHtml}<div class="tc-body" id="${uid}"></div></div>`;
+  document.getElementById('rc-layer').appendChild(wrap);
+  const cardEl=wrap.querySelector('.tc-card');const bodyEl=document.getElementById(uid);
+  const emojiCh=rv.hasRating&&rv.rating!=null?({5:'😄',4:'😊',3:'😐',2:'😢',1:'😭'}[rv.rating]||''):'🫥';
+  bodyEl.textContent=rv.title+' '+emojiCh;
+  const actualW=cardEl.offsetWidth||CW;const actualH=cardEl.offsetHeight||CH;
+  cardEl.style.width=actualW+'px';cardEl.style.minHeight=actualH+'px';
+
+  bodyEl.innerHTML='<span class="tc-cursor">|</span>';
+  const cardLeft=offX,cardRight=offX+actualW,cardTop=offY,cardBottom=offY+actualH;const R=16;
+  let endX,vY;
+  if(offX>0){endX=cardLeft;vY=Math.max(cardTop+R,Math.min(cardBottom-R,0))}
+  else if(cardRight<0){endX=cardRight;vY=Math.max(cardTop+R,Math.min(cardBottom-R,0))}
+  else{endX=Math.max(cardLeft+R,Math.min(cardRight-R,0));vY=cardBottom<0?cardBottom:(cardTop>0?cardTop:0);}
+  const pathLen=Math.abs(vY)+Math.abs(endX);
+  wrap.insertAdjacentHTML('afterbegin',`<svg class="tc-conn" style="left:-500px;top:-500px;width:1000px;height:1000px" viewBox="-500 -500 1000 1000"><polyline points="0,0 0,${vY} ${endX},${vY}" stroke="${col}" style="--len:${pathLen}"/></svg>`);
+  const worldPoints=[[pos.dotX,pos.dotY],[pos.dotX,pos.dotY+vY],[pos.dotX+endX,pos.dotY+vY]];
+  let lineOrDotOverPrev=false;
+  for(const ac of activeCards){for(const[px,py]of worldPoints){if(px>=ac.bounds.x&&px<=ac.bounds.x+ac.bounds.w&&py>=ac.bounds.y&&py<=ac.bounds.y+ac.bounds.h){lineOrDotOverPrev=true;break;}}if(lineOrDotOverPrev)break;}
+  if(lineOrDotOverPrev){const d=wrap.querySelector('.tc-dot');if(d)d.style.opacity='.4';const s=wrap.querySelector('.tc-conn');if(s)s.style.opacity='.4';}
+  const entry={el:wrap,bounds:{x:pos.x,y:pos.y,w:actualW,h:actualH}};activeCards.push(entry);
+  let rainTimer=null;
+  if(rv.hasRating&&rv.rating===5){setTimeout(()=>fireFanfare(pos.x,pos.y),1150);}
+  if(rv.hasRating&&rv.rating===1){setTimeout(()=>{rainTimer=fireStorm(wrap,offX+actualW/2,offY-15,actualW)},1150);}
+  setTimeout(()=>{
+    const el=document.getElementById(uid);if(!el)return;
+    el.innerHTML='';const cur=document.createElement('span');cur.className='tc-cursor';cur.textContent='|';el.appendChild(cur);
+    let i=0;
+    const t=setInterval(()=>{
+      if(i<rv.title.length){el.insertBefore(document.createTextNode(rv.title[i]),cur);i++;}
+      else{clearInterval(t);setTimeout(()=>{cur.style.display='none';const emoji={5:'😄',4:'😊',3:'😐',2:'😢',1:'😭'}[rv.rating];const em=document.createElement('span');em.className='tc-emoji';em.textContent=emoji;el.appendChild(em);},150);}
+    },58);
+  },1150);
+  setTimeout(()=>{
+    if(rainTimer)clearInterval(rainTimer);wrap.classList.add('tc-fade');
+    setTimeout(()=>{wrap.remove();const idx=activeCards.indexOf(entry);if(idx>-1)activeCards.splice(idx,1);processQueue();},450);
+  },CARD_LIFE);
+}
+function processQueue(){
+  let attempts=0;
+  while(cardQueue.length>0&&activeCards.length<MAX_ACTIVE&&attempts<cardQueue.length){
+    const rv=cardQueue.shift();const pos=findCardPosition(rv);
+    if(!pos){cardQueue.push(rv);attempts++;continue;}
+    renderTypingCard(rv,pos);attempts=0;
+  }
+}
+setInterval(processQueue,700);
+
+/* ============ FANFARE ============ */
+function fireFanfare(x,y){
+  const layer=document.getElementById('rc-layer');const shine=document.createElement('div');shine.className='shine-burst';shine.style.left=x+'px';shine.style.top=y+'px';layer.appendChild(shine);setTimeout(()=>shine.remove(),1200);
+  const colors=['#523cc3','#1cbda3','#64b5f6'];const N=28;
+  for(let i=0;i<N;i++){const p=document.createElement('div');p.className='confetti';p.style.left=x+'px';p.style.top=y+'px';p.style.background=colors[Math.floor(Math.random()*colors.length)];const angle=(Math.PI*2*(i/N))+(Math.random()-0.5)*0.5;const speed=70+Math.random()*110;p.style.setProperty('--dx',Math.cos(angle)*speed+'px');p.style.setProperty('--dy',(Math.sin(angle)*speed)+'px');p.style.setProperty('--rot',(Math.random()*720-360)+'deg');p.style.animationDelay=(Math.random()*100)+'ms';layer.appendChild(p);setTimeout(()=>p.remove(),1750);}
+}
+
+/* ============ RAIN/STORM ============ */
+function fireRainBurst(parent,cx,cy,width,n){for(let i=0;i<n;i++){const drop=document.createElement('div');drop.className='raindrop';drop.style.left=(cx+(Math.random()-0.5)*width)+'px';drop.style.top=cy+'px';drop.style.animationDelay=(Math.random()*400)+'ms';drop.style.animationDuration=(1.0+Math.random()*0.6)+'s';parent.appendChild(drop);setTimeout(()=>drop.remove(),2200);}}
+function fireStorm(wrap,cx,cy,width){
+  const puffs=[{dx:-92,dy:-6,w:118,h:54,d:0},{dx:-44,dy:-18,w:104,h:50,d:.08},{dx:8,dy:-14,w:110,h:52,d:.16},{dx:54,dy:-4,w:92,h:46,d:.24},{dx:-20,dy:2,w:96,h:44,d:.12}];
+  puffs.forEach(p=>{const c=document.createElement('div');c.className='storm-cloud';c.style.cssText=`left:${cx+p.dx}px;top:${cy+p.dy}px;width:${p.w}px;height:${p.h}px;animation-delay:${p.d}s,${(0.9+p.d).toFixed(2)}s;animation-duration:1s,${(6+Math.random()*3).toFixed(1)}s`;wrap.appendChild(c);});
+  function strike(){const fx=cx+(Math.random()-0.5)*width*0.5;const clouds=wrap.querySelectorAll('.storm-cloud');const lit=on=>clouds.forEach(cl=>cl.classList.toggle('lit',on));lit(true);setTimeout(()=>lit(false),70);setTimeout(()=>lit(true),150);setTimeout(()=>lit(false),300);const flash=document.createElement('div');flash.className='storm-flash';flash.style.left=fx+'px';flash.style.top=(cy-6)+'px';wrap.appendChild(flash);setTimeout(()=>flash.remove(),620);}
+  setTimeout(strike,300);setTimeout(strike,1500);fireRainBurst(wrap,cx,cy,width,10);
+  return setInterval(()=>fireRainBurst(wrap,cx,cy,width,7),500);
+}
+
+/* ============ MAP MARKERS ============ */
+function firePulse(rv){
+  const rc=rv.hasRating&&rv.rating!=null?rclass(rv.rating):'r-mid';
+  const ripple=L.divIcon({className:'',html:`<div class="pulse-marker"><div class="pd ${rc}"></div></div>`,iconSize:[16,16],iconAnchor:[8,8]});
+  const m=L.marker([rv.lat,rv.lon],{icon:ripple,interactive:false}).addTo(map);setTimeout(()=>map.removeLayer(m),3000);
+  const hi=L.divIcon({className:'',html:`<div class="heat-dot ${rc}"></div>`,iconSize:[8,8],iconAnchor:[4,4]});
+  const h=L.marker([rv.lat,rv.lon],{icon:hi,interactive:false}).addTo(map);
+  state.heatDots.push(h);
+  if(state.heatDots.length>500){map.removeLayer(state.heatDots.shift());}
+}
+
+/* ============ REVIEW PIPELINE ============ */
+function genReview(){
+  if(feedPool.length>0){
+    const item=feedPool[feedIdx%feedPool.length];
+    feedIdx=(feedIdx+1)%feedPool.length;
+    return genReviewFromFeedItem(item);
+  }
+  const region=pickRegion();const co=COMPANIES[Math.floor(Math.random()*COMPANIES.length)];const rating=pickRating();
+  const age=wpick(AGES,a=>a.weight).label;const career=wpick(CAREERS,c=>c.weight).label;
+  const review_type=wpick(REVIEW_TYPE_WEIGHTS,x=>x.w).v;
+  const[lat,lon]=jitter(region.lat,region.lon);
+  return{id:Date.now()+Math.random(),region,company:co.name,industry:co.industry,rating,hasRating:true,age,career,review_type,title:TITLES[Math.floor(Math.random()*TITLES.length)],lat,lon,timestamp:new Date()};
+}
+
+function handleReview(rv){
+  state.total++;
+  state.regionCounts[rv.region.code]++;
+  state.ageCounts[rv.age]=(state.ageCounts[rv.age]||0)+1;
+  state.careerCounts[rv.career]=(state.careerCounts[rv.career]||0)+1;
+  state.industryCounts[rv.industry]=(state.industryCounts[rv.industry]||0)+1;
+  state.companyCounts[rv.company]=(state.companyCounts[rv.company]||0)+1;
+  state.recentRates.push(Date.now());state.recentRates=state.recentRates.filter(t=>t>Date.now()-60000);
+  if(rv.hasRating&&rv.rating!=null){
+    state.ratingSum+=rv.rating;state.ratingCount++;state.ratingDist[rv.rating]++;
+    state.sentimentCounts[sent(rv.rating)]++;
+    state.ageRatingSum[rv.age]=(state.ageRatingSum[rv.age]||0)+rv.rating;state.ageRatingCount[rv.age]=(state.ageRatingCount[rv.age]||0)+1;
+    state.careerRatingSum[rv.career]=(state.careerRatingSum[rv.career]||0)+rv.rating;state.careerRatingCount[rv.career]=(state.careerRatingCount[rv.career]||0)+1;
+    state.industryRatingSum[rv.industry]=(state.industryRatingSum[rv.industry]||0)+rv.rating;state.industryRatingCount[rv.industry]=(state.industryRatingCount[rv.industry]||0)+1;
+    state.companyRatingSum[rv.company]=(state.companyRatingSum[rv.company]||0)+rv.rating;state.companyRatingCount[rv.company]=(state.companyRatingCount[rv.company]||0)+1;
+  }
+  state.feedItems.unshift(rv);if(state.feedItems.length>200)state.feedItems.pop();
+  firePulse(rv);showTypingCard(rv);
+  updatePanels();updateProvColors();updateIndustryPanel();
+  updateCumDisplay();
+}
+
+function updatePanels(){
+  const avg=state.ratingCount>0?(state.ratingSum/state.ratingCount).toFixed(2):'—';
+  document.getElementById('t-avg').textContent=avg;
+  document.getElementById('t-rate').textContent=state.recentRates.length;
+  setSlotNumber(document.getElementById('total-num'),state.total);
+  const pos=state.sentimentCounts.pos,neu=state.sentimentCounts.neu,neg=state.sentimentCounts.neg;const total=(pos+neu+neg)||1;
+  document.getElementById('s-pos').textContent=pos.toLocaleString();document.getElementById('s-neu').textContent=neu.toLocaleString();document.getElementById('s-neg').textContent=neg.toLocaleString();
+  const posP=(pos/total)*100,neuP=(neu/total)*100,negP=(neg/total)*100;
+  document.getElementById('sp-pos').textContent='('+Math.round(posP)+'%)';document.getElementById('sp-neu').textContent='('+Math.round(neuP)+'%)';document.getElementById('sp-neg').textContent='('+Math.round(negP)+'%)';
+  document.getElementById('sb-pos').style.flexBasis=posP+'%';document.getElementById('sb-neu').style.flexBasis=neuP+'%';document.getElementById('sb-neg').style.flexBasis=negP+'%';
+  const rmax=Math.max(...Object.values(state.ratingDist),1);
+  const rg=document.getElementById('rat-grid');rg.innerHTML='';
+  for(let s=5;s>=1;s--){const c=state.ratingDist[s];const pct=(c/rmax)*100;rg.innerHTML+=`<div class="rat-row"><span class="rat-star">${s}<i class="jp-star-solid"></i></span><div class="rat-trk"><div class="rat-fill" style="width:${pct}%"></div></div><span class="rat-ct">${c}</span></div>`}
+  const ageTotal=Object.values(state.ageCounts).reduce((s,v)=>s+v,0)||1;
+  const ageMax=Math.max(...Object.values(state.ageCounts),1);
+  const al=document.getElementById('age-list');al.innerHTML='';
+  AGES.forEach((a,i)=>{const c=state.ageCounts[a.label]||0;const pct=c/ageMax;const isMax=c===ageMax&&c>0;const pctTxt=Math.round(c/ageTotal*100);const rSum=state.ageRatingSum[a.label]||0;const rCnt=state.ageRatingCount[a.label]||0;const avgR=rCnt>0?(rSum/rCnt).toFixed(1):'—';const avgCol=rCnt>0?avgColor(parseFloat(avgR)):'var(--t3)';al.innerHTML+=`<div class="rrow"><span class="rrk ${isMax?'k1':''}">${String(i+1).padStart(2,'0')}</span><span class="rnm">${a.label}</span><span class="rvc">${c.toLocaleString()} <small style="color:var(--t3);font-weight:500">(${pctTxt}%)</small></span><span class="r-avg" style="color:${avgCol}">★${avgR}</span><div class="rbar" style="transform:scaleX(${pct})"></div></div>`;});
+  const carTotal=Object.values(state.careerCounts).reduce((s,v)=>s+v,0)||1;
+  let acc=0;const stops=[];
+  const dl=document.getElementById('donut-legend');dl.innerHTML='';
+  CAREERS.forEach(c=>{const cnt=state.careerCounts[c.label]||0;const p=cnt/carTotal*100;stops.push(`${c.color} ${acc}% ${acc+p}%`);acc+=p;const pctTxt=Math.round(p);const rSum=state.careerRatingSum[c.label]||0;const rCnt=state.careerRatingCount[c.label]||0;const avgR=rCnt>0?(rSum/rCnt).toFixed(1):'—';const avgCol=rCnt>0?avgColor(parseFloat(avgR)):'var(--t3)';dl.innerHTML+=`<div class="dl-item"><span class="dl-dot" style="background:${c.color}"></span><span class="dl-label">${c.label}</span><span class="dl-val">${pctTxt}%</span><span class="dl-avg" style="color:${avgCol}">★${avgR}</span></div>`;});
+  document.getElementById('donut').style.background=`conic-gradient(${stops.join(',')})`;
+  // Top companies: only update if server data not loaded yet
+  if(!serverDataLoaded){
+    const cos=Object.entries(state.companyCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const tl=document.getElementById('top-co');tl.innerHTML='';
+    for(let i=0;i<5;i++){
+      if(i<cos.length){const[nm,ct]=cos[i];const rkCls=i===0?'r1':'';const pIdx=state.prevTopNames.indexOf(nm);let swap='';if(state.prevTopNames.length>0){if(pIdx===-1||pIdx>i)swap='swap-up';else if(pIdx<i)swap='swap-down';}tl.innerHTML+=`<div class="tco-row"><span class="tco-rk ${rkCls}">${i+1}</span><span class="tco-nm ${swap}">${nm}</span><span class="tco-ct">${ct}</span></div>`}
+      else{tl.innerHTML+=`<div class="tco-row tco-empty"><span class="tco-rk">${i+1}</span><span class="tco-nm">—</span><span class="tco-ct">—</span></div>`}
+    }
+    state.prevTopNames=cos.map(c=>c[0]);
+    document.getElementById('co-total').textContent=`${Object.keys(state.companyCounts).length}개 기업`;
+  }
+  const elig=Object.keys(state.companyRatingCount).filter(c=>(state.companyRatingCount[c]||0)>=3);
+  if(elig.length>0){const wa=elig.map(c=>({name:c,avg:state.companyRatingSum[c]/state.companyRatingCount[c]})).sort((a,b)=>b.avg-a.avg);[[wa[0],'bw-best-co','bw-best-r','#00C274'],[wa[wa.length-1],'bw-worst-co','bw-worst-r','#f44336']].forEach(([d,coId,rtId,col])=>{const coEl=document.getElementById(coId);const rtEl=document.getElementById(rtId);if(!coEl||!rtEl)return;const changed=coEl.textContent!==d.name;coEl.textContent=d.name;rtEl.innerHTML=`${d.avg.toFixed(2)}<span class="stars-row">${starsHtml(Math.round(d.avg),col)}</span>`;if(changed){[coEl,rtEl].forEach(el=>{el.classList.remove('bw-swap');void el.offsetWidth;el.classList.add('bw-swap')})}})}
+}
+
+/* ============ FEED ============ */
+function createFeedItem(rv){const div=document.createElement('div');div.className=`fi ${rv.hasRating&&rv.rating!=null?rclass(rv.rating):'r-mid'}`;const col=rv.hasRating&&rv.rating!=null?rcolor(rv.rating):'#8B8FA8';const stars=rv.hasRating&&rv.rating!=null?starsHtml(rv.rating,col):'';const rtHtml=rv.hasRating&&rv.rating!=null?`${rv.rating}.0<span class="stars-row">${stars}</span>`:'—';div.innerHTML=`<div class="fi-meta"><span class="fi-time">${fmt(rv.timestamp)}</span><span class="fi-reg">${rv.region.name}</span><span class="fi-rt">${rtHtml}</span></div><div class="fi-co">${rv.company}</div><div class="fi-ind">${rv.industry}</div><div class="fi-txt">${rv.title}</div>`;return div}
+function pushFeed(rv){}
+
+/* ============ TICKER ============ */
+setInterval(()=>{const n=new Date();const hh=n.getHours(),mm=n.getMinutes(),ss=n.getSeconds();document.getElementById('t-clock').textContent=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;state.recentRates=state.recentRates.filter(t=>t>Date.now()-60000);document.getElementById('t-rate').textContent=state.recentRates.length;if(hh===0&&mm===0&&ss<3)location.reload();},1000);
+
+/* ============ SCHEDULER ============ */
+function nextDelay(){return 550+Math.random()*700}
+function schedule(){setTimeout(()=>{handleReview(genReview());schedule()},nextDelay())}
+
+function fitLeftPanel(){
+  const lp=document.querySelector('.lp'),fit=document.querySelector('.lp-fit');
+  if(!lp||!fit)return;
+  const availH=lp.clientHeight,baseW=lp.clientWidth;
+  fit.style.transform='none';fit.style.width=baseW+'px';fit.style.height='auto';
+  const natural=fit.scrollHeight;
+  const r=availH/natural;
+  fit.style.transform='scale('+r+')';fit.style.width=(baseW/r)+'px';fit.style.height=natural+'px';
+}
+window.addEventListener('resize',fitLeftPanel);
+
+updatePanels();
+updateCumDisplay();
+loadServerData();
+requestAnimationFrame(()=>requestAnimationFrame(fitLeftPanel));
+setTimeout(fitLeftPanel,400);
+
+// card loop starts after BQ feed loads (feedDataLoaded=true in loadServerData)
+</script>
+</body>
+</html>
