@@ -611,26 +611,107 @@ app.get('/', (req, res) => {
   });
 });
 
-// 자정(KST) 캐시 자동 무효화
+// 자정(KST) 캐시 자동 무효화: 클라이언트 리로드 전에 캐시를 미리 갱신한다.
 function scheduleMidnightRefresh() {
-  const kstNow = Date.now() + 9 * 3600 * 1000;
-  const kstDate = new Date(kstNow);
-  const nextMidnightKst = new Date(kstNow);
-  nextMidnightKst.setUTCHours(nextMidnightKst.getUTCHours() - kstDate.getUTCHours() % 24);
-  nextMidnightKst.setUTCHours(15, 0, 10, 0); // KST 00:00:10 = UTC 15:00:10
-  if (nextMidnightKst.getTime() <= Date.now()) {
-    nextMidnightKst.setUTCDate(nextMidnightKst.getUTCDate() + 1);
+  const now = Date.now();
+
+  // KST 23:59:50 = UTC 14:59:50
+  const next = new Date(now);
+  next.setUTCHours(14, 59, 50, 0);
+  if (next.getTime() <= now) {
+    next.setUTCDate(next.getUTCDate() + 1);
   }
-  const delay = nextMidnightKst.getTime() - Date.now();
-  setTimeout(() => {
+
+  const delay = next.getTime() - now;
+  setTimeout(async () => {
     cache = null; cacheAt = 0;
     liveCache = null; liveCacheAt = 0;
     mtdCache = null; mtdCacheAt = 0;
     pvCache = null; pvCacheAt = 0;
-    console.log('[MIDNIGHT] 모든 캐시 무효화 — 다음 요청 시 BQ 재조회');
+    console.log('[MIDNIGHT] 캐시 무효화 완료 (KST 23:59:50) — BQ 프리워밍 시작');
+
+    try {
+      const [[statsRows], [feedRows], [totalRows]] = await Promise.all([
+        bq.query({ query: STATS_QUERY,       location: 'asia-northeast3' }),
+        bq.query({ query: FEED_QUERY,        location: 'asia-northeast3' }),
+        bq.query({ query: TOTAL_COUNT_QUERY, location: 'asia-northeast3' }),
+      ]);
+
+      const totals = statsRows.reduce((acc, r) => ({
+        general:   acc.general   + Number(r.general_review_cnt),
+        premium:   acc.premium   + Number(r.premium_review_cnt),
+        benefit:   acc.benefit   + Number(r.benefit_review_cnt),
+        interview: acc.interview + Number(r.interview_review_cnt),
+        salary:    acc.salary    + Number(r.salary_review_cnt),
+        total:     acc.total     + Number(r.total_cnt),
+      }), { general: 0, premium: 0, benefit: 0, interview: 0, salary: 0, total: 0 });
+
+      const feedTypeCounts = feedRows.reduce((acc, r) => {
+        acc[r.review_type] = (acc[r.review_type] || 0) + 1;
+        return acc;
+      }, {});
+      const feedDateVal = feedRows.length > 0
+        ? (feedRows[0].feed_date?.value ?? feedRows[0].feed_date ?? null)
+        : null;
+      const typeRatios = totals.total > 0 ? {
+        general:   totals.general   / totals.total,
+        premium:   totals.premium   / totals.total,
+        benefit:   totals.benefit   / totals.total,
+        interview: totals.interview / totals.total,
+        salary:    totals.salary    / totals.total,
+      } : { general: 0.4, premium: 0.2, benefit: 0.15, interview: 0.15, salary: 0.1 };
+
+      cache = {
+        trend: statsRows.map(r => ({
+          approved_date:        r.approved_date?.value ?? r.approved_date,
+          general_review_cnt:   Number(r.general_review_cnt),
+          premium_review_cnt:   Number(r.premium_review_cnt),
+          benefit_review_cnt:   Number(r.benefit_review_cnt),
+          interview_review_cnt: Number(r.interview_review_cnt),
+          salary_review_cnt:    Number(r.salary_review_cnt),
+          total_cnt:            Number(r.total_cnt),
+        })),
+        latest: feedRows.length > 0 ? {
+          approved_date:        feedDateVal,
+          general_review_cnt:   feedTypeCounts['general_review']   || 0,
+          premium_review_cnt:   feedTypeCounts['premium_review']   || 0,
+          benefit_review_cnt:   feedTypeCounts['benefit_review']   || 0,
+          interview_review_cnt: feedTypeCounts['interview_review'] || 0,
+          salary_review_cnt:    feedTypeCounts['salary_review']    || 0,
+          total_cnt:            feedRows.length,
+        } : null,
+        totals,
+        typeRatios,
+        totalApproved: totalRows.length > 0 ? Number(totalRows[0].total_approved) : null,
+        feedDate: feedDateVal,
+        feed: feedRows.map(r => ({
+          review_type:      r.review_type,
+          approved_ts:      r.approved_ts,
+          company_name:     r.company_name || '(기업명 없음)',
+          city_name:        r.city_name    || null,
+          occupation:       r.occupation   || null,
+          experience_year:  r.experience_year != null ? Number(r.experience_year) : null,
+          industry:         r.industry     || null,
+          company_size:     r.company_size || null,
+          company_lat:      r.company_lat != null ? Number(r.company_lat) : null,
+          company_lng:      r.company_lng != null ? Number(r.company_lng) : null,
+          company_city:     r.company_city || null,
+          rating:           r.rating != null ? Number(r.rating) : null,
+          review_title:     r.review_title || null,
+          user_age:         r.user_age != null ? Number(r.user_age) : null,
+        })),
+        queriedAt: new Date().toISOString(),
+      };
+      cacheAt = Date.now();
+      console.log(`[MIDNIGHT] 프리워밍 완료 — feed: ${feedRows.length}건, feedDate: ${feedDateVal}`);
+    } catch (err) {
+      console.error('[MIDNIGHT] 프리워밍 실패 (클라이언트 요청 시 재조회):', err.message);
+    }
+
     scheduleMidnightRefresh();
   }, delay);
-  console.log(`[MIDNIGHT] 다음 갱신: ${new Date(nextMidnightKst.getTime()).toISOString()} (${Math.round(delay / 60000)}분 후)`);
+
+  console.log(`[MIDNIGHT] 다음 캐시 무효화: ${new Date(next.getTime()).toISOString()} (${Math.round(delay / 60000)}분 후)`);
 }
 
 if (require.main === module) {

@@ -460,7 +460,8 @@ function cityNameToRegion(cn){if(!cn)return null;const cd=PROV_TO_CODE[cn];retur
 function compCityToRegion(cn){
   if(!cn)return null;
   const exact=PROV_TO_CODE[cn];if(exact)return REGIONS.find(r=>r.code===exact)||null;
-  const map=[['서울','SEL'],['경기','GGD'],['인천','ICN'],['부산','BUS'],['대구','DAG'],['광주','GWJ'],['대전','DJN'],['울산','USN'],['세종','SJG'],['강원','GWD'],['충북','CNB'],['충청북','CNB'],['충남','CNA'],['충청남','CNA'],['전북','JNB'],['전라북','JNB'],['전남','JND'],['전라남','JND'],['경북','GBD'],['경상북','GBD'],['경남','GND'],['경상남','GND'],['제주','JJU']];
+  // REGIONS 배열과 같은 코드 체계를 사용해야 지역 매핑이 누락되지 않는다.
+  const map=[['서울','SEL'],['경기','GGD'],['인천','ICN'],['부산','BSN'],['대구','DGU'],['광주','GJU'],['대전','DJN'],['울산','ULS'],['세종','SEJ'],['강원','GWD'],['충북','CBD'],['충청북','CBD'],['충남','CND'],['충청남','CND'],['전북','JBD'],['전라북','JBD'],['전남','JND'],['전라남','JND'],['경북','GBD'],['경상북','GBD'],['경남','GND'],['경상남','GND'],['제주','JJU']];
   for(const[pfx,code]of map){if(cn.startsWith(pfx))return REGIONS.find(r=>r.code===code)||null;}
   return null;
 }
@@ -796,7 +797,24 @@ function firePulse(rv){
 function genReview(){
   if(feedPool.length>0){
     const item=feedPool[feedIdx%feedPool.length];
+    const prevIdx=feedIdx;
     feedIdx=(feedIdx+1)%feedPool.length;
+    if(feedIdx===0&&prevIdx===feedPool.length-1){
+      state.total=0;
+      state.ageCounts={};state.careerCounts={};state.industryCounts={};state.companyCounts={};
+      state.companyRatingSum={};state.companyRatingCount={};
+      state.regionCounts=Object.fromEntries(REGIONS.map(r=>[r.code,0]));
+      state.sentimentCounts={pos:0,neu:0,neg:0};state.ratingSum=0;state.ratingCount=0;
+      state.ratingDist={1:0,2:0,3:0,4:0,5:0};
+      state.ageRatingSum={};state.ageRatingCount={};state.careerRatingSum={};state.careerRatingCount={};
+      state.industryRatingSum={};state.industryRatingCount={};
+      state.feedItems=[];state.prevTopNames=[];state.recentRates=[];
+      indTickerReady=false;indOffset=0;tcoOffset=0;lastIndUpdate=0;
+      if(indRollTimer){clearInterval(indRollTimer);indRollTimer=null;}
+      if(tcoRollTimer){clearInterval(tcoRollTimer);tcoRollTimer=null;}
+      feedPool=feedPool.slice().sort(()=>Math.random()-.5);
+      console.log('[LOOP] 피드 사이클 완료 → 카운터 리셋, 재셔플');
+    }
     return genReviewFromFeedItem(item);
   }
   const region=pickRegion();const co=COMPANIES[Math.floor(Math.random()*COMPANIES.length)];const rating=pickRating();
@@ -870,7 +888,29 @@ function createFeedItem(rv){const div=document.createElement('div');div.classNam
 function pushFeed(rv){}
 
 /* ============ TICKER ============ */
-setInterval(()=>{const n=new Date();const hh=n.getHours(),mm=n.getMinutes(),ss=n.getSeconds();document.getElementById('t-clock').textContent=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;state.recentRates=state.recentRates.filter(t=>t>Date.now()-60000);document.getElementById('t-rate').textContent=state.recentRates.length;if(hh===0&&mm===0&&ss<3)location.reload();},1000);
+setInterval(()=>{const n=new Date();const hh=n.getHours(),mm=n.getMinutes(),ss=n.getSeconds();document.getElementById('t-clock').textContent=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;state.recentRates=state.recentRates.filter(t=>t>Date.now()-60000);document.getElementById('t-rate').textContent=state.recentRates.length;if(hh===0&&mm===0&&ss>=30&&ss<33)location.reload();},1000);
+
+/* ============ WAKE LOCK ============ */
+async function acquireWakeLock(){
+  if('wakeLock' in navigator){
+    try{
+      if(window._wl&&!window._wl.released)return;
+      window._wl=await navigator.wakeLock.request('screen');
+      console.log('[WakeLock] 화면 절전 방지 활성화');
+      window._wl.addEventListener('release',()=>{
+        console.log('[WakeLock] 해제됨 — 3초 후 재획득');
+        setTimeout(acquireWakeLock,3000);
+      });
+    }catch(e){console.warn('[WakeLock] 미지원 또는 실패:',e.message);}
+  }
+}
+acquireWakeLock();
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    console.log('[Tab] 탭 활성화 — WakeLock 재획득 시도');
+    acquireWakeLock();
+  }
+});
 
 /* ============ SCHEDULER ============ */
 function nextDelay(){return 550+Math.random()*700}
