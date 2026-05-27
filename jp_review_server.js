@@ -42,6 +42,7 @@ function isIpInCidr(ip, cidr) {
   const rangeInt = ipv4ToInt(range);
   const prefix = Number(prefixText);
 
+
   if (ipInt === null || rangeInt === null || prefix < 0 || prefix > 32) return false;
   const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
   return (ipInt & mask) === (rangeInt & mask);
@@ -375,23 +376,35 @@ const PV_QUERY = `
 
 let cache = null;
 let cacheAt = 0;
+let cacheDateKey = null;
 const CACHE_TTL = 10 * 60 * 1000;
 
 let liveCache = null;
 let liveCacheAt = 0;
+let liveCacheDateKey = null;
 const LIVE_CACHE_TTL = 5 * 60 * 1000;
 
 let mtdCache = null;
 let mtdCacheAt = 0;
+let mtdCacheDateKey = null;
 const MTD_CACHE_TTL = 60 * 60 * 1000; // 1시간
 
 let pvCache = null;
 let pvCacheAt = 0;
+let pvCacheDateKey = null;
 const PV_CACHE_TTL = 60 * 60 * 1000; // 1시간
+
+function getKstDateKey(now = Date.now()) {
+  return new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function isCacheFresh(cached, cachedAt, ttl, cachedDateKey) {
+  return Boolean(cached) && cachedDateKey === getKstDateKey() && Date.now() - cachedAt < ttl;
+}
 
 app.get('/api/reviews', async (req, res) => {
   try {
-    if (cache && Date.now() - cacheAt < CACHE_TTL) {
+    if (isCacheFresh(cache, cacheAt, CACHE_TTL, cacheDateKey)) {
       return res.json(cache);
     }
 
@@ -475,6 +488,7 @@ app.get('/api/reviews', async (req, res) => {
       queriedAt: new Date().toISOString(),
     };
     cacheAt = Date.now();
+    cacheDateKey = getKstDateKey(cacheAt);
 
     console.log(`[BQ] done — stats: ${statsRows.length}일, feed: ${feedRows.length}건, feedDate: ${feedDateVal}`);
     res.json(cache);
@@ -486,7 +500,7 @@ app.get('/api/reviews', async (req, res) => {
 
 app.get('/api/reviews/live', async (req, res) => {
   try {
-    if (liveCache && Date.now() - liveCacheAt < LIVE_CACHE_TTL) {
+    if (isCacheFresh(liveCache, liveCacheAt, LIVE_CACHE_TTL, liveCacheDateKey)) {
       return res.json(liveCache);
     }
 
@@ -511,6 +525,7 @@ app.get('/api/reviews/live', async (req, res) => {
       queriedAt: new Date().toISOString(),
     };
     liveCacheAt = Date.now();
+    liveCacheDateKey = getKstDateKey(liveCacheAt);
 
     console.log(`[BQ] live: ${rows.length}건`);
     res.json(liveCache);
@@ -522,7 +537,7 @@ app.get('/api/reviews/live', async (req, res) => {
 
 app.get('/api/mtd', async (req, res) => {
   try {
-    if (mtdCache && Date.now() - mtdCacheAt < MTD_CACHE_TTL) {
+    if (isCacheFresh(mtdCache, mtdCacheAt, MTD_CACHE_TTL, mtdCacheDateKey)) {
       return res.json(mtdCache);
     }
 
@@ -565,6 +580,7 @@ app.get('/api/mtd', async (req, res) => {
       queriedAt: new Date().toISOString(),
     };
     mtdCacheAt = Date.now();
+    mtdCacheDateKey = getKstDateKey(mtdCacheAt);
 
     console.log(`[BQ] MTD curr=${curr?.approved_cnt ?? 0}, prev=${prev?.approved_cnt ?? 0}, top3=${top3Rows.length}건`);
     res.json(mtdCache);
@@ -576,7 +592,7 @@ app.get('/api/mtd', async (req, res) => {
 
 app.get('/api/pv', async (req, res) => {
   try {
-    if (pvCache && Date.now() - pvCacheAt < PV_CACHE_TTL) {
+    if (isCacheFresh(pvCache, pvCacheAt, PV_CACHE_TTL, pvCacheDateKey)) {
       return res.json(pvCache);
     }
 
@@ -592,6 +608,7 @@ app.get('/api/pv', async (req, res) => {
       queriedAt: new Date().toISOString(),
     };
     pvCacheAt = Date.now();
+    pvCacheDateKey = getKstDateKey(pvCacheAt);
 
     console.log(`[BQ] PV: ${pvRows.length}건`);
     res.json(pvCache);
@@ -611,13 +628,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// 자정(KST) 캐시 자동 무효화: 클라이언트 리로드 전에 캐시를 미리 갱신한다.
+// 자정(KST) 캐시 자동 무효화: 날짜가 바뀐 뒤 어제 기준 데이터로 프리워밍한다.
 function scheduleMidnightRefresh() {
   const now = Date.now();
 
-  // KST 23:59:50 = UTC 14:59:50
+  // KST 00:00:10 = UTC 15:00:10
   const next = new Date(now);
-  next.setUTCHours(14, 59, 50, 0);
+  next.setUTCHours(15, 0, 10, 0);
   if (next.getTime() <= now) {
     next.setUTCDate(next.getUTCDate() + 1);
   }
@@ -628,7 +645,11 @@ function scheduleMidnightRefresh() {
     liveCache = null; liveCacheAt = 0;
     mtdCache = null; mtdCacheAt = 0;
     pvCache = null; pvCacheAt = 0;
-    console.log('[MIDNIGHT] 캐시 무효화 완료 (KST 23:59:50) — BQ 프리워밍 시작');
+    cacheDateKey = null;
+    liveCacheDateKey = null;
+    mtdCacheDateKey = null;
+    pvCacheDateKey = null;
+    console.log('[MIDNIGHT] 캐시 무효화 완료 (KST 00:00:10) — BQ 프리워밍 시작');
 
     try {
       const [[statsRows], [feedRows], [totalRows]] = await Promise.all([
@@ -703,6 +724,7 @@ function scheduleMidnightRefresh() {
         queriedAt: new Date().toISOString(),
       };
       cacheAt = Date.now();
+      cacheDateKey = getKstDateKey(cacheAt);
       console.log(`[MIDNIGHT] 프리워밍 완료 — feed: ${feedRows.length}건, feedDate: ${feedDateVal}`);
     } catch (err) {
       console.error('[MIDNIGHT] 프리워밍 실패 (클라이언트 요청 시 재조회):', err.message);
