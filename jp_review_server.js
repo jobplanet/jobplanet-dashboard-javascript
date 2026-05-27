@@ -42,6 +42,7 @@ function isIpInCidr(ip, cidr) {
   const rangeInt = ipv4ToInt(range);
   const prefix = Number(prefixText);
 
+  
   if (ipInt === null || rangeInt === null || prefix < 0 || prefix > 32) return false;
   const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
   return (ipInt & mask) === (rangeInt & mask);
