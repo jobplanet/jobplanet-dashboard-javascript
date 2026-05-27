@@ -8,6 +8,56 @@ const app = express();
 const PORT = 3333;
 const HTML_PATH = path.join(__dirname, 'public');
 
+const ALLOWED_IPV4_CIDRS = [
+  '101.2.200.18/32',
+  '101.2.200.50/32',
+  '121.156.104.151/32',
+  '121.156.104.155/32',
+  '211.60.110.192/32',
+  '211.60.110.192/29',
+  // Do not add 211.60.110.192/0: /0 would allow every IPv4 address.
+  '211.60.110.193/32',
+  '211.60.110.194/32',
+  '211.60.110.195/32',
+  '211.60.110.196/32',
+  '211.60.110.197/32',
+  '211.60.110.198/32',
+];
+
+function ipv4ToInt(ip) {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+
+  return parts.reduce((acc, part) => {
+    if (!/^\d+$/.test(part)) return null;
+    const value = Number(part);
+    if (value < 0 || value > 255) return null;
+    return ((acc << 8) | value) >>> 0;
+  }, 0);
+}
+
+function isIpInCidr(ip, cidr) {
+  const [range, prefixText = '32'] = cidr.split('/');
+  const ipInt = ipv4ToInt(ip);
+  const rangeInt = ipv4ToInt(range);
+  const prefix = Number(prefixText);
+
+  if (ipInt === null || rangeInt === null || prefix < 0 || prefix > 32) return false;
+  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+  return (ipInt & mask) === (rangeInt & mask);
+}
+
+function getClientIp(req) {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  const firstForwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+  return (firstForwardedIp || req.ip || req.socket.remoteAddress || '').split(',')[0].trim();
+}
+
+function isAllowedClientIp(ip) {
+  if (!ip || ip.includes(':')) return false;
+  return ALLOWED_IPV4_CIDRS.some(cidr => isIpInCidr(ip, cidr));
+}
+
 const KEY_PATH = path.join(__dirname, 'service-account.json');
 const bqOptions = { projectId: 'jobplanet-korea-production' };
 if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
@@ -16,6 +66,23 @@ if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
   bqOptions.keyFilename = KEY_PATH;
 }
 const bq = new BigQuery(bqOptions);
+
+app.use((req, res, next) => {
+  const shouldEnforceIpAllowlist = process.env.VERCEL === '1' || process.env.IP_ALLOWLIST_ENFORCE === 'true';
+  if (!shouldEnforceIpAllowlist) {
+    next();
+    return;
+  }
+
+  const clientIp = getClientIp(req);
+  if (isAllowedClientIp(clientIp)) {
+    next();
+    return;
+  }
+
+  console.warn(`[IP_BLOCK] ${req.method} ${req.url} ip=${clientIp || 'unknown'}`);
+  res.status(403).send('Forbidden');
+});
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
