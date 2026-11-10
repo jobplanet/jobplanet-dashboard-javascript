@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node jp_review_server.js",
     "dev": "node jp_review_server.js",
-    "build": "node -e \"console.log('No build step required for static HTML + Express API')\""
+    "build": "node -e \"console.log('No build step required for static HTML + Express API')\"",
+    "snapshot": "node scripts/build_public_snapshot.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
@@ -22,6 +24,7 @@
   "homepage": "https://github.com/jobplanet/jobplanet-dashboard-javascript#readme",
   "dependencies": {
     "@google-cloud/bigquery": "^8.3.1",
+    "@vercel/blob": "2.8.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"
   }

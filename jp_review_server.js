@@ -3,6 +3,8 @@ require('dotenv').config({ quiet: true });
 const { BigQuery } = require('@google-cloud/bigquery');
 const path = require('path');
 const fs = require('fs');
+const { generatePublicSnapshot } = require('./lib/public_snapshot');
+const { saveSnapshot, loadSnapshotText } = require('./lib/snapshot_store');
 
 const app = express();
 const PORT = 3333;
@@ -59,6 +61,14 @@ function isAllowedClientIp(ip) {
   return ALLOWED_IPV4_CIDRS.some(cidr => isIpInCidr(ip, cidr));
 }
 
+// 외부 공개 경로: IP 허용목록을 적용하지 않는다.
+// - /external/*: 외부용 화면과 하루 1회 만든 스냅샷 JSON (BigQuery 조회 없음)
+// - CRON_PATH: Vercel Cron 이 호출한다. 대신 CRON_SECRET 으로 막는다.
+const CRON_PATH = '/api/cron/public-snapshot';
+function isPublicPath(p) {
+  return p === '/external' || p.startsWith('/external/') || p === CRON_PATH;
+}
+
 const KEY_PATH = path.join(__dirname, 'service-account.json');
 const bqOptions = { projectId: 'jobplanet-korea-production' };
 if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
@@ -70,7 +80,7 @@ const bq = new BigQuery(bqOptions);
 
 app.use((req, res, next) => {
   const shouldEnforceIpAllowlist = process.env.VERCEL === '1' || process.env.IP_ALLOWLIST_ENFORCE === 'true';
-  if (!shouldEnforceIpAllowlist) {
+  if (!shouldEnforceIpAllowlist || isPublicPath(req.path)) {
     next();
     return;
   }
@@ -615,6 +625,56 @@ app.get('/api/pv', async (req, res) => {
   } catch (err) {
     console.error('[BQ] pv error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── 외부 공개용 ──────────────────────────────────────────────
+// 하루 1회 Cron 이 스냅샷을 만들어 저장하고, 외부 화면은 저장된 JSON만 읽는다.
+let publicSnapshotText = null;
+let publicSnapshotAt = 0;
+const PUBLIC_SNAPSHOT_TTL = 10 * 60 * 1000;
+
+app.get('/external/snapshot.json', async (req, res) => {
+  try {
+    if (!publicSnapshotText || Date.now() - publicSnapshotAt >= PUBLIC_SNAPSHOT_TTL) {
+      const text = await loadSnapshotText();
+      if (text) {
+        publicSnapshotText = text;
+        publicSnapshotAt = Date.now();
+      }
+    }
+    if (!publicSnapshotText) {
+      res.status(503).json({ error: 'snapshot_not_ready' });
+      return;
+    }
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+    res.type('application/json').send(publicSnapshotText);
+  } catch (err) {
+    console.error('[PUBLIC] snapshot load error:', err.message);
+    res.status(503).json({ error: 'snapshot_unavailable' });
+  }
+});
+
+app.get(CRON_PATH, async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error('[CRON] CRON_SECRET 이 설정되지 않아 실행하지 않음');
+    res.status(500).json({ error: 'cron_secret_missing' });
+    return;
+  }
+  if (req.headers.authorization !== `Bearer ${secret}`) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  try {
+    const snapshot = await generatePublicSnapshot(bq);
+    const saved = await saveSnapshot(snapshot);
+    publicSnapshotText = null;
+    console.log(`[CRON] public snapshot saved — baseDate=${snapshot.baseDate}, reviews=${snapshot.summary.reviewCount}, ${saved.store}`);
+    res.json({ ok: true, baseDate: snapshot.baseDate, reviewCount: snapshot.summary.reviewCount, store: saved.store });
+  } catch (err) {
+    console.error('[CRON] public snapshot failed:', err.message);
+    res.status(500).json({ error: 'snapshot_failed' });
   }
 });
 

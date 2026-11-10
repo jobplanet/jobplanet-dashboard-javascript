@@ -115,3 +115,36 @@ Production 배포:
 ```bash
 vercel --prod
 ```
+
+## 외부 공개용 화면 (`/external/`)
+
+잠재고객 등 외부에 보여주는 화면입니다. 사내 TV용 화면(`/`)과 API(`/api/*`)는 그대로 두고 IP 허용목록으로 막습니다.
+
+- 하루 1회 Vercel Cron이 `/api/cron/public-snapshot`을 호출해 BigQuery를 조회하고, 외부에 보여줄 값만 담은 JSON을 Vercel Blob(private)에 저장합니다.
+- 외부 화면은 `/external/snapshot.json`(저장된 JSON)만 읽습니다. 외부 방문자의 요청은 BigQuery에 닿지 않습니다.
+- 스냅샷에 담기지 않는 것: 작성자 나이·연차 원값(BigQuery 안에서 구간으로 바꾼 뒤 집계로만 내보냄), 승인 시각, 리뷰 ID, 리뷰탭 PV/UV 수치, MTD·누적 리뷰 수. 값이 비어 있으면 지어내지 않습니다.
+- 기본으로 꺼진 항목(T&S 확인 후 환경변수로 켬):
+
+| 환경변수 | 켜면 |
+|---|---|
+| `PUBLIC_SHOW_REVIEW_TEXT=true` | 카드에 리뷰 한줄평 원문 표시 |
+| `PUBLIC_SHOW_TOP_VIEWED=true` | "이달 많이 본 기업" 순위 표시 (기업명·순위만, 수치 없음) |
+
+### Vercel 설정 (처음 한 번)
+
+1. Storage › Blob 스토어를 **Private**로 만들고 이 프로젝트에 연결합니다. `BLOB_READ_WRITE_TOKEN`이 자동으로 들어갑니다.
+2. 환경변수 `CRON_SECRET`에 임의의 긴 문자열을 넣습니다. Cron 경로는 IP 허용목록 밖이라 이 값으로 막습니다. 없으면 실행을 거부합니다.
+3. 배포하면 `vercel.json`의 `crons`에 따라 매일 06:00 KST(21:00 UTC)에 스냅샷이 만들어집니다. 첫 스냅샷은 Vercel 대시보드 › Cron Jobs에서 수동으로 한 번 실행합니다.
+
+### 로컬에서 보기
+
+```bash
+bun run snapshot   # BigQuery 조회 → .local/public-snapshot.json
+bun start          # http://localhost:3333/external/
+```
+
+### 테스트
+
+```bash
+bun run test       # 스냅샷에 들어가면 안 되는 값이 없는지 검사
+```

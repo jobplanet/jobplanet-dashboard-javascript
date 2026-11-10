@@ -15,5 +15,11 @@
       "source": "/(.*)",
       "destination": "/api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/public-snapshot",
+      "schedule": "0 21 * * *"
+    }
   ]
 }
