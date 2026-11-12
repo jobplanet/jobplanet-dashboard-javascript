@@ -445,7 +445,7 @@ function toReview(card){
 }
 
 /* ============ MAP ============ */
-const map=L.map('map',{preferCanvas:true,center:[36.2,127.7],zoom:7,minZoom:6,maxZoom:11,zoomControl:true,attributionControl:false,maxBounds:[[32.0,123.5],[39.5,132.0]],maxBoundsViscosity:.85});
+const map=L.map('map',{preferCanvas:true,center:[36.2,127.7],zoom:7,minZoom:6,maxZoom:11,zoomControl:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false,boxZoom:false,keyboard:false,attributionControl:false,maxBounds:[[32.0,123.5],[39.5,132.0]],maxBoundsViscosity:.85});
 map.fitBounds([[33.0,124.5],[38.6,130.0]],{padding:[10,10]});
 Promise.all([
   fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()),
